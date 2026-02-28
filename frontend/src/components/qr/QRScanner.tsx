@@ -7,17 +7,24 @@ interface QRScannerProps {
 
 export default function QRScanner({ onScan }: QRScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const isStoppedRef = useRef(false);
 
   useEffect(() => {
     const scanner = new Html5Qrcode("qr-reader");
     scannerRef.current = scanner;
+    isStoppedRef.current = false;
 
     scanner.start(
       { facingMode: "environment" },
       { fps: 10, qrbox: { width: 250, height: 250 } },
       (decodedText) => {
-        onScan(decodedText);
-        scanner.stop();
+        if (!isStoppedRef.current) {
+          isStoppedRef.current = true;
+          scanner.stop().catch(() => {
+            // Ignore stop errors
+          });
+          onScan(decodedText);
+        }
       },
       undefined
     ).catch(err => {
@@ -25,12 +32,10 @@ export default function QRScanner({ onScan }: QRScannerProps) {
     });
 
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch((err) => {
-          // Ignore "not running" errors
-          if (!err.message?.includes('not running')) {
-            console.error('Scanner stop error:', err);
-          }
+      if (scannerRef.current && !isStoppedRef.current) {
+        isStoppedRef.current = true;
+        scannerRef.current.stop().catch(() => {
+          // Ignore stop errors during cleanup
         });
       }
     };
