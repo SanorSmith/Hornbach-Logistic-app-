@@ -35,6 +35,8 @@ export default function LineFeederDashboard() {
 
   const handleQRScan = async (qrCode: string) => {
     try {
+      console.log('Scanning QR code:', qrCode);
+      
       const { data, error } = await supabase
         .from('red_points')
         .select(`
@@ -45,7 +47,45 @@ export default function LineFeederDashboard() {
         .eq('qr_code', qrCode)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        if (error.code === 'PGRST116') {
+          // No rows returned - QR code not found
+          // Try to extract point number from QR code (fallback)
+          const pointNumberMatch = qrCode.match(/RP-(\d{3})/);
+          if (pointNumberMatch) {
+            const pointNumber = parseInt(pointNumberMatch[1]);
+            try {
+              const { data: pointData, error: pointError } = await supabase
+                .from('red_points')
+                .select(`
+                  *,
+                  department:departments(*),
+                  current_user:users(id, full_name)
+                `)
+                .eq('point_number', pointNumber)
+                .single();
+
+              if (pointError) throw pointError;
+              
+              if (pointData) {
+                // @ts-ignore - Supabase type inference issue
+                toast.success(`Punkt ${pointData.point_number} hittad via nummer!`);
+                // @ts-ignore - Supabase type inference issue
+                setSelectedPoint(pointData);
+                setShowScanner(false);
+                return;
+              }
+            } catch (fallbackError) {
+              console.error('Fallback search failed:', fallbackError);
+            }
+          }
+          toast.error(`QR-kod "${qrCode}" hittades inte i systemet`);
+        } else {
+          toast.error('Kunde inte söka efter QR-kod');
+        }
+        return;
+      }
 
       if (data) {
         // @ts-ignore - Supabase type inference issue
