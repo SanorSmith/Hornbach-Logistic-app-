@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const qr_controller_1 = require("../controllers/qr.controller");
+const auth_1 = require("../middleware/auth");
+const router = (0, express_1.Router)();
+router.use(auth_1.requireAuth);
+router.post('/scan', qr_controller_1.scanQRCode);
+router.get('/generate/:pointId', qr_controller_1.generateQRCode);
+exports.default = router;

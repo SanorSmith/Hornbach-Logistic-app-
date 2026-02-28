@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const history_controller_1 = require("../controllers/history.controller");
+const auth_1 = require("../middleware/auth");
+const router = (0, express_1.Router)();
+router.use(auth_1.requireAuth);
+router.get('/point/:pointId', history_controller_1.getPointHistory);
+router.get('/', (0, auth_1.requireRole)(['ADMIN', 'TEAM_LEADER', 'MONITOR']), history_controller_1.getAllHistory);
+exports.default = router;

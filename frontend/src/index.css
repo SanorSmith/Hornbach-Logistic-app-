@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ledig: #4CAF50;
+  --color-ledig-light: #81C784;
+  --color-ledig-dark: #388E3C;
+  
+  --color-upptagen: #FFC107;
+  --color-upptagen-light: #FFD54F;
+  --color-upptagen-dark: #FFA000;
+  
+  --color-skrap: #FF9800;
+  --color-skrap-light: #FFB74D;
+  --color-skrap-dark: #F57C00;
+  
+  --color-kundorder: #F44336;
+  --color-kundorder-light: #E57373;
+  --color-kundorder-dark: #D32F2F;
+
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-bounce-slow: bounce 2s infinite;
+  --animate-fade-in: fadeIn 0.5s ease-in-out;
+  --animate-slide-up: slideUp 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slideUp {
+  0% { 
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% { 
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

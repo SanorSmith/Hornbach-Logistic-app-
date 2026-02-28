@@ -1,0 +1,126 @@
+import { useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { useRedPointsStore } from '../store/redPointsStore';
+import { RedPoint } from '../types';
+import toast from 'react-hot-toast';
+
+export function useRedPoints() {
+  const { points, setPoints, updatePoint, setLoading } = useRedPointsStore();
+
+  useEffect(() => {
+    fetchRedPoints();
+
+    const channel = supabase
+      .channel('red-points-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'red_points',
+        },
+        (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            handleRealtimeUpdate(payload.new as RedPoint);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchRedPoints = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('red_points')
+        .select(`
+          *,
+          department:departments(*),
+          current_user:users(id, full_name)
+        `)
+        .eq('is_active', true)
+        .order('point_number', { ascending: true });
+
+      if (error) throw error;
+
+      setPoints(data || []);
+    } catch (error: any) {
+      console.error('Error fetching red points:', error);
+      toast.error('Fel vid hämtning av röda punkter');
+      setLoading(false);
+    }
+  };
+
+  const handleRealtimeUpdate = async (updatedPoint: RedPoint) => {
+    const { data, error } = await supabase
+      .from('red_points')
+      .select(`
+        *,
+        department:departments(*),
+        current_user:users(id, full_name)
+      `)
+      .eq('id', updatedPoint.id)
+      .single();
+
+    if (!error && data) {
+      updatePoint(data);
+    }
+  };
+
+  const updatePointStatus = async (
+    pointId: string,
+    status: RedPoint['status'],
+    notes?: string
+  ) => {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      
+      // @ts-ignore - Supabase type inference issue
+      const { data, error } = await supabase
+        .from('red_points')
+        .update({
+          status,
+          current_user_id: status === 'UPPTAGEN' ? user.user?.id : null,
+        })
+        .eq('id', pointId)
+        .select(`
+          *,
+          department:departments(*),
+          current_user:users(id, full_name)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      if (notes && data) {
+        // @ts-ignore - Supabase type inference issue
+        await supabase.from('status_history').insert({
+          point_id: pointId,
+          user_id: user.user!.id,
+          // @ts-ignore
+          old_status: data.status,
+          new_status: status,
+          action_type: 'STATUS_CHANGE',
+          notes,
+        });
+      }
+
+      toast.success('Status uppdaterad!');
+      return data;
+    } catch (error: any) {
+      console.error('Error updating status:', error);
+      toast.error('Fel vid uppdatering av status');
+      return null;
+    }
+  };
+
+  return {
+    points,
+    isLoading: useRedPointsStore((state) => state.isLoading),
+    updatePointStatus,
+    refreshPoints: fetchRedPoints,
+  };
+}

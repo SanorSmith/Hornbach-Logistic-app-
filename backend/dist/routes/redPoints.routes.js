@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const redPoints_controller_1 = require("../controllers/redPoints.controller");
+const auth_1 = require("../middleware/auth");
+const router = (0, express_1.Router)();
+router.use(auth_1.requireAuth);
+router.get('/', redPoints_controller_1.getAllRedPoints);
+router.get('/:id', redPoints_controller_1.getRedPointById);
+router.patch('/:id/status', redPoints_controller_1.updateRedPointStatus);
+router.post('/', (0, auth_1.requireRole)(['ADMIN', 'TEAM_LEADER']), redPoints_controller_1.createRedPoint);
+router.delete('/:id', (0, auth_1.requireRole)(['ADMIN']), redPoints_controller_1.deleteRedPoint);
+exports.default = router;

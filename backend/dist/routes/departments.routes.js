@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const departments_controller_1 = require("../controllers/departments.controller");
+const auth_1 = require("../middleware/auth");
+const router = (0, express_1.Router)();
+router.use(auth_1.requireAuth);
+router.get('/', departments_controller_1.getAllDepartments);
+router.post('/', (0, auth_1.requireRole)(['ADMIN', 'TEAM_LEADER']), departments_controller_1.createDepartment);
+router.patch('/:id', (0, auth_1.requireRole)(['ADMIN', 'TEAM_LEADER']), departments_controller_1.updateDepartment);
+router.delete('/:id', (0, auth_1.requireRole)(['ADMIN']), departments_controller_1.deleteDepartment);
+exports.default = router;
