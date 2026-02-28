@@ -71,9 +71,13 @@ export default function LineFeederDashboard() {
               if (pointData) {
                 // @ts-ignore - Supabase type inference issue
                 toast.success(`Punkt ${pointData.point_number} hittad via nummer!`);
-                // @ts-ignore - Supabase type inference issue
-                setSelectedPoint(pointData);
+                // Close scanner first
                 setShowScanner(false);
+                // Small delay to ensure scanner is closed before opening action modal
+                setTimeout(() => {
+                  // @ts-ignore - Supabase type inference issue
+                  setSelectedPoint(pointData);
+                }, 100);
                 return;
               }
             } catch (fallbackError) {
@@ -90,9 +94,13 @@ export default function LineFeederDashboard() {
       if (data) {
         // @ts-ignore - Supabase type inference issue
         toast.success(`Punkt ${data.point_number} scannad!`);
-        // @ts-ignore - Supabase type inference issue
-        setSelectedPoint(data);
+        // Close scanner first
         setShowScanner(false);
+        // Small delay to ensure scanner is closed before opening action modal
+        setTimeout(() => {
+          // @ts-ignore - Supabase type inference issue
+          setSelectedPoint(data);
+        }, 100);
       } else {
         toast.error('Ogiltig QR-kod');
       }
