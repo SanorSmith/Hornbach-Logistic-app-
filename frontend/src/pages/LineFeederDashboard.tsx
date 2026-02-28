@@ -35,7 +35,7 @@ export default function LineFeederDashboard() {
 
   const handleQRScan = async (qrCode: string) => {
     try {
-      console.log('Scanning QR code:', qrCode);
+      console.log('QR Scanner v0.0.1 - Scanning QR code:', qrCode);
       
       const { data, error } = await supabase
         .from('red_points')
