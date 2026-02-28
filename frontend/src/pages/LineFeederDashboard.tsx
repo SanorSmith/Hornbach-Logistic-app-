@@ -39,11 +39,7 @@ export default function LineFeederDashboard() {
       
       const { data, error } = await supabase
         .from('red_points')
-        .select(`
-          *,
-          department:departments(*),
-          current_user:users(id, full_name)
-        `)
+        .select('*')
         .eq('qr_code', qrCode)
         .single();
 
@@ -58,11 +54,7 @@ export default function LineFeederDashboard() {
             try {
               const { data: pointData, error: pointError } = await supabase
                 .from('red_points')
-                .select(`
-                  *,
-                  department:departments(*),
-                  current_user:users(id, full_name)
-                `)
+                .select('*')
                 .eq('point_number', pointNumber)
                 .single();
 
