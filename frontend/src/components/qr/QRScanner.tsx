@@ -25,7 +25,14 @@ export default function QRScanner({ onScan }: QRScannerProps) {
     });
 
     return () => {
-      scanner.stop().catch(console.error);
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch((err) => {
+          // Ignore "not running" errors
+          if (!err.message?.includes('not running')) {
+            console.error('Scanner stop error:', err);
+          }
+        });
+      }
     };
   }, [onScan]);
 
