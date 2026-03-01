@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 export function useDepartmentAssignments() {
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const hasFetched = useRef(false);
 
   const fetchAllAssignments = async () => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+    
     try {
       setLoading(true);
       console.log('Starting to fetch assignments...');

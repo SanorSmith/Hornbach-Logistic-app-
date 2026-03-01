@@ -78,7 +78,14 @@ export function useRedPoints() {
     try {
       const { data: user } = await supabase.auth.getUser();
       
-      // @ts-ignore - Supabase type inference issue
+      // First, get the current point data for history
+      const { data: currentPoint } = await supabase
+        .from('red_points')
+        .select('status')
+        .eq('id', pointId)
+        .single();
+
+      // Update the point status
       const { data, error } = await supabase
         .from('red_points')
         .update({
@@ -86,27 +93,26 @@ export function useRedPoints() {
           current_user_id: status === 'UPPTAGEN' ? user.user?.id : null,
         })
         .eq('id', pointId)
-        .select(`
-          *,
-          department:departments(*),
-          current_user:users(id, full_name)
-        `)
+        .select('*')
         .single();
 
       if (error) throw error;
 
-      if (notes && data) {
+      if (notes && currentPoint) {
         // @ts-ignore - Supabase type inference issue
         await supabase.from('status_history').insert({
           point_id: pointId,
           user_id: user.user!.id,
           // @ts-ignore
-          old_status: data.status,
+          old_status: currentPoint.status,
           new_status: status,
           action_type: 'STATUS_CHANGE',
           notes,
         });
       }
+
+      // Refresh the points to get updated data
+      await fetchRedPoints();
 
       toast.success('Status uppdaterad!');
       return data;
