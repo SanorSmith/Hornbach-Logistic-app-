@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, TrendingUp, Users, MapPin, Activity } from 'lucide-react';
+import { Home, TrendingUp, Users, MapPin, Activity, Clock, Package, AlertCircle, UserCheck, BarChart3 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { PointStatus } from '../types';
 
@@ -13,6 +13,25 @@ interface Stats {
   kundorder: number;
   activeUsers: number;
   todayChanges: number;
+}
+
+interface LineFeeder {
+  id: string;
+  full_name: string;
+  email: string;
+  is_active: boolean;
+}
+
+interface LineFeederPerformance {
+  userId: string;
+  userName: string;
+  blocksProcessed: number;
+  statusChanges: number;
+  averageTimePerBlock: number; // in minutes
+  idleTime: number; // in minutes
+  shiftStart: string;
+  lastActivity: string;
+  efficiency: number; // percentage
 }
 
 export default function TeamLeaderDashboard() {
@@ -27,9 +46,14 @@ export default function TeamLeaderDashboard() {
     todayChanges: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [lineFeeders, setLineFeeders] = useState<LineFeeder[]>([]);
+  const [selectedLineFeeder, setSelectedLineFeeder] = useState<string>('');
+  const [lineFeederPerformance, setLineFeederPerformance] = useState<LineFeederPerformance | null>(null);
+  const [performanceLoading, setPerformanceLoading] = useState(false);
 
   useEffect(() => {
     fetchStats();
+    fetchLineFeeders();
     
     // Subscribe to real-time updates
     const subscription = supabase
@@ -96,6 +120,83 @@ export default function TeamLeaderDashboard() {
 
   const handleManageTeam = () => {
     navigate('/team');
+  };
+
+  const fetchLineFeeders = async () => {
+    try {
+      // @ts-ignore - Supabase type inference issue
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, full_name, email, is_active')
+        .eq('role', 'LINEFEEDER')
+        .eq('is_active', true)
+        .order('full_name');
+
+      if (error) throw error;
+      setLineFeeders(data || []);
+    } catch (error: any) {
+      console.error('Error fetching line feeders:', error);
+    }
+  };
+
+  const fetchLineFeederPerformance = async (userId: string) => {
+    if (!userId) return;
+    
+    setPerformanceLoading(true);
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Get today's status changes for this user
+      // @ts-ignore - Supabase type inference issue
+      const { data: statusChanges, error: changesError } = await supabase
+        .from('status_history')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('timestamp', today.toISOString())
+        .order('timestamp', { ascending: false });
+
+      if (changesError) throw changesError;
+
+      // Calculate performance metrics
+      const blocksProcessed = statusChanges?.length || 0;
+      const averageTimePerBlock = blocksProcessed > 0 ? 5 : 0; // Default 5 minutes per block
+      const efficiency = blocksProcessed > 0 ? Math.min(100, (blocksProcessed / 8) * 100) : 0; // 8 blocks = 100%
+      
+      const now = new Date();
+      const shiftStart = new Date(today.setHours(6, 0, 0, 0)); // 6 AM shift start
+      const shiftDuration = (now.getTime() - shiftStart.getTime()) / (1000 * 60); // in minutes
+      const workTime = blocksProcessed * averageTimePerBlock;
+      const idleTime = Math.max(0, shiftDuration - workTime);
+
+      // Get user info
+      const user = lineFeeders.find(lf => lf.id === userId);
+      
+      setLineFeederPerformance({
+        userId,
+        userName: user?.full_name || 'Unknown',
+        blocksProcessed,
+        statusChanges: blocksProcessed,
+        averageTimePerBlock,
+        idleTime: Math.round(idleTime),
+        shiftStart: shiftStart.toISOString(),
+        lastActivity: statusChanges?.[0]?.timestamp || now.toISOString(),
+        efficiency: Math.round(efficiency)
+      });
+    } catch (error: any) {
+      console.error('Error fetching line feeder performance:', error);
+    } finally {
+      setPerformanceLoading(false);
+    }
+  };
+
+  const handleLineFeederChange = (userId: string) => {
+    setSelectedLineFeeder(userId);
+    if (userId) {
+      fetchLineFeederPerformance(userId);
+    } else {
+      setLineFeederPerformance(null);
+    }
   };
 
   const fetchStats = async () => {
@@ -266,6 +367,201 @@ export default function TeamLeaderDashboard() {
               <p className="text-xs text-red-600 mt-1">{(stats.kundorder / stats.totalPoints * 100).toFixed(1)}% av total</p>
             </div>
           </div>
+        </div>
+
+        {/* LineFeeder Performance Tracking */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">LineFeeder Prestationsrapport</h2>
+          
+          {/* LineFeeder Selector */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Välj LineFeeder</label>
+            <div className="flex items-center gap-4">
+              <select
+                value={selectedLineFeeder}
+                onChange={(e) => handleLineFeederChange(e.target.value)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="">Välj en LineFeeder...</option>
+                {lineFeeders.map((feeder) => (
+                  <option key={feeder.id} value={feeder.id}>
+                    {feeder.full_name} - {feeder.email}
+                  </option>
+                ))}
+              </select>
+              
+              {selectedLineFeeder && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <UserCheck size={16} className="text-green-600" />
+                  <span>Aktiv</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Performance Metrics */}
+          {performanceLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Laddar prestandadata...</p>
+            </div>
+          ) : lineFeederPerformance ? (
+            <div className="space-y-6">
+              {/* Key Performance Indicators */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 rounded-lg shadow-lg"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold opacity-90">Block Behandlade</h3>
+                    <Package size={20} />
+                  </div>
+                  <p className="text-3xl font-bold">{lineFeederPerformance.blocksProcessed}</p>
+                  <p className="text-xs opacity-75 mt-1">Idag</p>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="bg-gradient-to-br from-green-500 to-green-600 text-white p-4 rounded-lg shadow-lg"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold opacity-90">Effektivitet</h3>
+                    <BarChart3 size={20} />
+                  </div>
+                  <p className="text-3xl font-bold">{lineFeederPerformance.efficiency}%</p>
+                  <p className="text-xs opacity-75 mt-1">Prestanda</p>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-4 rounded-lg shadow-lg"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold opacity-90">Genomsnittstid</h3>
+                    <Clock size={20} />
+                  </div>
+                  <p className="text-3xl font-bold">{lineFeederPerformance.averageTimePerBlock}</p>
+                  <p className="text-xs opacity-75 mt-1">Minuter/block</p>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-4 rounded-lg shadow-lg"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold opacity-90">Tomgångstid</h3>
+                    <AlertCircle size={20} />
+                  </div>
+                  <p className="text-3xl font-bold">{Math.round(lineFeederPerformance.idleTime / 60)}</p>
+                  <p className="text-xs opacity-75 mt-1">Timmar</p>
+                </motion.div>
+              </div>
+
+              {/* Detailed Activity Report */}
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Live Aktivitetsrapport</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Status Transformation Times */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+                      <Activity size={16} className="text-blue-600" />
+                      Status Transformationer
+                    </h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Totala statusändringar:</span>
+                        <span className="font-medium">{lineFeederPerformance.statusChanges}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Genomsnittlig tid:</span>
+                        <span className="font-medium">{lineFeederPerformance.averageTimePerBlock} min</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Senaste aktivitet:</span>
+                        <span className="font-medium">
+                          {new Date(lineFeederPerformance.lastActivity).toLocaleTimeString('sv-SE', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Shift Information */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+                      <Clock size={16} className="text-green-600" />
+                      Skiftinformation
+                    </h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Skiftstart:</span>
+                        <span className="font-medium">
+                          {new Date(lineFeederPerformance.shiftStart).toLocaleTimeString('sv-SE', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Arbetstid:</span>
+                        <span className="font-medium">
+                          {Math.round((lineFeederPerformance.blocksProcessed * lineFeederPerformance.averageTimePerBlock) / 60)} h
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Tomgångstid:</span>
+                        <span className="font-medium">{Math.round(lineFeederPerformance.idleTime / 60)} h</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Efficiency Bar */}
+                <div className="mt-6">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-medium text-gray-700">Effektivitetsgrad</h4>
+                    <span className="text-sm font-medium text-gray-600">{lineFeederPerformance.efficiency}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${lineFeederPerformance.efficiency}%` }}
+                      transition={{ duration: 1, ease: "easeOut" }}
+                      className={`h-3 rounded-full ${
+                        lineFeederPerformance.efficiency >= 80 ? 'bg-green-500' :
+                        lineFeederPerformance.efficiency >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {lineFeederPerformance.efficiency >= 80 ? 'Utmärkt prestanda' :
+                      lineFeederPerformance.efficiency >= 60 ? 'Bra prestanda' : 'Behöver förbättring'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : selectedLineFeeder ? (
+            <div className="text-center py-8">
+              <AlertCircle size={48} className="mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-500">Ingen prestandadata tillgänglig för denna LineFeeder</p>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <UserCheck size={48} className="mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-500">Välj en LineFeeder för att se prestandadata</p>
+            </div>
+          )}
         </div>
 
         {/* Quick Actions */}
