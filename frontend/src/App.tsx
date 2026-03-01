@@ -6,6 +6,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import TeamLeaderDashboard from './pages/TeamLeaderDashboard';
 import MonitorDashboard from './pages/MonitorDashboard';
 import DepartmentDashboard from './pages/DepartmentDashboard';
+import TeamManagement from './pages/TeamManagement';
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
         <Route path="/teamleader" element={<TeamLeaderDashboard />} />
         <Route path="/monitor" element={<MonitorDashboard />} />
         <Route path="/department" element={<DepartmentDashboard />} />
+        <Route path="/team" element={<TeamManagement />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -277,13 +277,22 @@ export default function AdminDashboard() {
               <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
               <p className="text-sm text-gray-600">Systemadministration och användarhantering</p>
             </div>
-            <button
-              onClick={() => navigate('/')}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
-            >
-              <Home size={20} />
-              <span className="hidden sm:inline">Hem</span>
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/team')}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+              >
+                <Users size={20} />
+                <span className="hidden sm:inline">Team Management</span>
+              </button>
+              <button
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+              >
+                <Home size={20} />
+                <span className="hidden sm:inline">Hem</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
