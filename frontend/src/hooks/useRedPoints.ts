@@ -86,6 +86,12 @@ export function useRedPoints() {
         .single();
 
       // Update the point status
+      console.log('Attempting update with:', {
+        pointId,
+        status,
+        current_user_id: status === 'UPPTAGEN' ? user.user?.id : null,
+      });
+
       const { error } = await supabase
         .from('red_points')
         .update({
@@ -94,7 +100,15 @@ export function useRedPoints() {
         })
         .eq('id', pointId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Update error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        throw error;
+      }
 
       if (notes && currentPoint) {
         // @ts-ignore - Supabase type inference issue
