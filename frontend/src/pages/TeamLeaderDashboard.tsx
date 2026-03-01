@@ -124,6 +124,18 @@ export default function TeamLeaderDashboard() {
 
   const fetchLineFeeders = async () => {
     try {
+      console.log('Fetching LineFeeders...');
+      
+      // First, try to get all users to see what roles exist
+      const { data: allUsers, error: allUsersError } = await supabase
+        .from('users')
+        .select('id, full_name, email, role, is_active')
+        .eq('is_active', true);
+
+      console.log('All users:', allUsers);
+      console.log('All users error:', allUsersError);
+
+      // Then try to get LINEFEEDER users
       const { data, error } = await supabase
         .from('users')
         .select('id, full_name, email, is_active')
@@ -131,8 +143,35 @@ export default function TeamLeaderDashboard() {
         .eq('is_active', true)
         .order('full_name');
 
+      console.log('LineFeeder data:', data);
+      console.log('LineFeeder error:', error);
+
       if (error) throw error;
       setLineFeeders((data as any) || []);
+      
+      // If no LINEFEEDER users found, try with 'LineFeeder' (different case)
+      if (!data || data.length === 0) {
+        console.log('No LINEFEEDER users found, trying LineFeeder...');
+        const { data: altData, error: altError } = await supabase
+          .from('users')
+          .select('id, full_name, email, is_active')
+          .eq('role', 'LineFeeder')
+          .eq('is_active', true)
+          .order('full_name');
+        
+        console.log('Alternative LineFeeder data:', altData);
+        console.log('Alternative LineFeeder error:', altError);
+        
+        if (!altError && altData) {
+          setLineFeeders(altData as any);
+        } else {
+          // If still no users found, show all active users as fallback
+          console.log('No LineFeeder users found, showing all users as fallback');
+          if (allUsers && allUsers.length > 0) {
+            setLineFeeders(allUsers as any);
+          }
+        }
+      }
     } catch (error: any) {
       console.error('Error fetching line feeders:', error);
     }
