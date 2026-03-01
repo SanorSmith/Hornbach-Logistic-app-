@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Plus, Edit2, Trash2, Shield, Building2, Mail, Calendar, Search, Filter, X, Check, AlertCircle, UserPlus, UserMinus } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Shield, Building2, Mail, Calendar, Search, Filter, X, Check, AlertCircle, UserPlus, UserMinus, Home } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { User, UserRole, Department } from '../types';
 import toast from 'react-hot-toast';
 
 export default function TeamManagement() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -267,13 +269,22 @@ export default function TeamManagement() {
                 <p className="text-sm text-gray-600">Användarhantering</p>
               </div>
             </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
-            >
-              <UserPlus size={20} />
-              <span>Lägg till användare</span>
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+              >
+                <Home size={20} />
+                <span className="hidden sm:inline">Hem</span>
+              </button>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+              >
+                <UserPlus size={20} />
+                <span>Lägg till användare</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
