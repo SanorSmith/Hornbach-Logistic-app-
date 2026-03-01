@@ -85,14 +85,26 @@ export function useRedPoints() {
         .eq('id', pointId)
         .single();
 
-      // Update the point status
+      // Update the point status - MINIMAL TEST
       console.log('Attempting update with:', {
         pointId,
         status,
         current_user_id: status === 'UPPTAGEN' ? user.user?.id : null,
       });
 
-      const { error } = await supabase
+      // Test 1: Try minimal update with just status
+      const { error: error1 } = await supabase
+        .from('red_points')
+        .update({ status: 'LEDIG' })
+        .eq('id', pointId);
+
+      if (error1) {
+        console.error('Minimal update error:', error1);
+        throw error1;
+      }
+
+      // Test 2: Try with current_user_id
+      const { error: error2 } = await supabase
         .from('red_points')
         .update({
           status,
@@ -100,14 +112,19 @@ export function useRedPoints() {
         })
         .eq('id', pointId);
 
-      if (error) {
-        console.error('Update error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
+      if (error2) {
+        console.error('Full update error:', error2);
+        throw error2;
+      }
+
+      if (error2) {
+        console.error('Full update error details:', {
+          message: error2.message,
+          details: error2.details,
+          hint: error2.hint,
+          code: error2.code,
         });
-        throw error;
+        throw error2;
       }
 
       if (notes && currentPoint) {
