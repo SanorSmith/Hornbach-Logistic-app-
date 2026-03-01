@@ -49,6 +49,11 @@ export default function DepartmentDashboard() {
   };
 
   const departmentPoints = points.filter(p => {
+  // Special case: show all unassigned points
+  if (selectedDepartment === 'UNASSIGNED') {
+    return !assignments[p.id];
+  }
+  
   // Show points that are assigned to this department OR belong to this department
   const isAssignedToDept = assignments[p.id];
   const belongsToDept = p.department_id === selectedDepartment;
@@ -93,7 +98,11 @@ export default function DepartmentDashboard() {
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">Avdelnings Dashboard</h1>
                 <p className="text-sm text-gray-600">
-                  {currentDepartment ? `${currentDepartment.name} - ${currentDepartment.location}` : 'Välj avdelning'}
+                  {selectedDepartment === 'UNASSIGNED' 
+                    ? 'Alla otilldelade punkter' 
+                    : currentDepartment 
+                      ? `${currentDepartment.name} - ${currentDepartment.location}` 
+                      : 'Välj avdelning'}
                 </p>
               </div>
             </div>
@@ -130,6 +139,7 @@ export default function DepartmentDashboard() {
             onChange={(e) => setSelectedDepartment(e.target.value)}
             className="w-full md:w-96 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           >
+            <option value="UNASSIGNED">Visa alla otilldelade punkter</option>
             {departments.map((dept) => (
               <option key={dept.id} value={dept.id}>
                 {dept.name} - {dept.location}
