@@ -95,8 +95,7 @@ export default function TeamLeaderDashboard() {
   };
 
   const handleManageTeam = () => {
-    // TODO: Implement team management functionality
-    alert('Hantera Team - Kommer snart!\n\nFunktioner som kommer:\n- Visa teammedlemmar\n- Ändra roller\n- Hantera behörigheter');
+    navigate('/team');
   };
 
   const fetchStats = async () => {
