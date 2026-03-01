@@ -86,15 +86,13 @@ export function useRedPoints() {
         .single();
 
       // Update the point status
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('red_points')
         .update({
           status,
           current_user_id: status === 'UPPTAGEN' ? user.user?.id : null,
         })
-        .eq('id', pointId)
-        .select('*')
-        .single();
+        .eq('id', pointId);
 
       if (error) throw error;
 
@@ -115,7 +113,7 @@ export function useRedPoints() {
       await fetchRedPoints();
 
       toast.success('Status uppdaterad!');
-      return data;
+      return true;
     } catch (error: any) {
       console.error('Error updating status:', error);
       toast.error('Fel vid uppdatering av status');
