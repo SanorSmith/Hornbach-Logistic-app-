@@ -104,12 +104,18 @@ export function useRedPoints() {
       }
 
       // Test 2: Try with current_user_id
+      const updateData: any = { status };
+      
+      // Only add current_user_id for UPPTAGEN status
+      if (status === 'UPPTAGEN' && user.user?.id) {
+        updateData.current_user_id = user.user.id;
+      } else if (status !== 'UPPTAGEN') {
+        updateData.current_user_id = null;
+      }
+
       const { error: error2 } = await supabase
         .from('red_points')
-        .update({
-          status,
-          current_user_id: status === 'UPPTAGEN' ? user.user?.id : null,
-        })
+        .update(updateData)
         .eq('id', pointId);
 
       if (error2) {
