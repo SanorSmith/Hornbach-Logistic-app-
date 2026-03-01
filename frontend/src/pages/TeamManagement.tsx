@@ -78,32 +78,35 @@ export default function TeamManagement() {
       // Generate temporary password
       const tempPassword = Math.random().toString(36).slice(-8);
 
-      // Create user in auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      // Create user in auth using signup
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: tempPassword,
-        email_confirm: true,
-        user_metadata: {
-          full_name: formData.full_name,
-          role: formData.role
+        options: {
+          data: {
+            full_name: formData.full_name,
+            role: formData.role
+          }
         }
       });
 
       if (authError) throw authError;
 
       // Create user in database
-      const { error: dbError } = await supabase
-        .from('users')
-        .insert({
-          id: authData.user.id,
-          email: formData.email,
-          full_name: formData.full_name,
-          role: formData.role,
-          department_id: formData.department_id || null,
-          is_active: formData.is_active
-        } as any);
+      if (authData.user) {
+        const { error: dbError } = await supabase
+          .from('users')
+          .insert({
+            id: authData.user.id,
+            email: formData.email,
+            full_name: formData.full_name,
+            role: formData.role,
+            department_id: formData.department_id || null,
+            is_active: formData.is_active
+          } as any);
 
-      if (dbError) throw dbError;
+        if (dbError) throw dbError;
+      }
 
       toast.success(`Användare skapad! Temporärt lösenord: ${tempPassword}`);
       setShowCreateModal(false);
