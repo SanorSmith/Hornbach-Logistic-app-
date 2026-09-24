@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RedPoint, PointStatus } from '../../types';
-import { X, Package, Trash2, CheckCircle, User } from 'lucide-react';
+import { X, Package, Trash2, CheckCircle, Camera, Loader2, ImageOff } from 'lucide-react';
+import { format } from 'date-fns';
+import { sv } from 'date-fns/locale';
+import toast from 'react-hot-toast';
+import { getPointImages, uploadPointImage, MAX_IMAGES_PER_POINT, PointImage } from '../../lib/pointImages';
 import { getStatusLabel } from '../../utils/statusColors';
 import StatusCircle from './StatusCircle';
 
@@ -19,11 +23,54 @@ export default function PointActionModal({
   allowedActions,
 }: PointActionModalProps) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [notes, setNotes] = useState('');
+  const [images, setImages] = useState<PointImage[]>([]);
+  const [imagesLoading, setImagesLoading] = useState(true);
+  const cameraInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPointImages(point.id)
+      .then((result) => !cancelled && setImages(result))
+      .catch((error) => console.error('Error loading point images:', error))
+      .finally(() => !cancelled && setImagesLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [point.id]);
 
   const handleUpdateStatus = async (newStatus: PointStatus) => {
+    // Marking as UPPTAGEN requires a photo: open the camera first.
+    if (newStatus === 'UPPTAGEN') {
+      cameraInput.current?.click();
+      return;
+    }
     setIsUpdating(true);
     await onUpdateStatus(newStatus, notes || undefined);
+    setIsUpdating(false);
+    onClose();
+  };
+
+  const handlePhotoTaken = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = ''; // allow taking the same photo again
+    if (!file) return; // camera cancelled - status is not changed
+
+    setIsUpdating(true);
+    setIsUploading(true);
+    try {
+      await uploadPointImage(point.id, file);
+    } catch (error) {
+      console.error('Error uploading point image:', error);
+      toast.error('Kunde inte spara bilden. Status ändrades inte.');
+      setIsUpdating(false);
+      setIsUploading(false);
+      return;
+    }
+    setIsUploading(false);
+
+    await onUpdateStatus('UPPTAGEN', notes || undefined);
     setIsUpdating(false);
     onClose();
   };
@@ -36,7 +83,7 @@ export default function PointActionModal({
         color: 'bg-ledig hover:bg-ledig-dark',
       },
       UPPTAGEN: {
-        icon: User,
+        icon: Camera,
         label: 'Markera som Upptagen',
         color: 'bg-upptagen hover:bg-upptagen-dark',
       },
@@ -68,15 +115,24 @@ export default function PointActionModal({
           ${config.color}
         `}
       >
-        <Icon size={20} />
-        {config.label}
+        {status === 'UPPTAGEN' && isUploading ? (
+          <>
+            <Loader2 size={20} className="animate-spin" />
+            Sparar bild...
+          </>
+        ) : (
+          <>
+            <Icon size={20} />
+            {config.label}
+          </>
+        )}
       </button>
     );
   };
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -125,6 +181,53 @@ export default function PointActionModal({
               )}
             </div>
           </div>
+
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">Senaste bilder</span>
+              <span className="text-xs text-gray-500">
+                {images.length}/{MAX_IMAGES_PER_POINT}
+              </span>
+            </div>
+            {imagesLoading ? (
+              <div className="grid grid-cols-3 gap-2">
+                {Array.from({ length: MAX_IMAGES_PER_POINT }).map((_, i) => (
+                  <div key={i} className="aspect-square rounded-lg bg-gray-100 animate-pulse" />
+                ))}
+              </div>
+            ) : images.length === 0 ? (
+              <div className="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 p-3 text-sm text-gray-500">
+                <ImageOff size={18} />
+                Inga bilder ännu. En bild tas när punkten markeras som upptagen.
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {images.map((image) => (
+                  <a
+                    key={image.id}
+                    href={image.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative block aspect-square overflow-hidden rounded-lg bg-gray-100"
+                  >
+                    <img src={image.url} alt="Bild av punkten" className="h-full w-full object-cover transition group-hover:scale-105" />
+                    <span className="absolute inset-x-0 bottom-0 bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
+                      {format(new Date(image.created_at), 'd MMM HH:mm', { locale: sv })}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <input
+            ref={cameraInput}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handlePhotoTaken}
+          />
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
