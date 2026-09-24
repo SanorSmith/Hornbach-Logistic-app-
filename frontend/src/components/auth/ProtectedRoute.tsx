@@ -24,6 +24,11 @@ export default function ProtectedRoute({ children, roles }: ProtectedRouteProps)
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
+  // Temporary password: nothing else is reachable until the user picks their own.
+  if (user.must_change_password && location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />;
+  }
+
   if (roles && !roles.includes(user.role)) {
     return <Navigate to={HOME_ROUTE[user.role]} replace />;
   }

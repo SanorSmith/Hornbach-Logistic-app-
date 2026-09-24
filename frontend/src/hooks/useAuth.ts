@@ -94,10 +94,19 @@ export function useAuth() {
     return profile;
   };
 
+  /** Re-reads the current user's profile (e.g. after changing password). */
+  const refreshProfile = async () => {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return null;
+    const profile = await loadProfile(data.user);
+    useAuthStore.getState().setUser(profile, data.user);
+    return profile;
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     useAuthStore.getState().logout();
   };
 
-  return { user, supabaseUser, isLoading, signIn, signOut };
+  return { user, supabaseUser, isLoading, signIn, signOut, refreshProfile };
 }

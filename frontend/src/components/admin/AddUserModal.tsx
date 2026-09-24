@@ -38,7 +38,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess, departments }
 
       toast.success(
         temporary_password
-          ? `Användare skapad! Temporärt lösenord: ${temporary_password}`
+          ? `Användare skapad! Temporärt lösenord: ${temporary_password} – användaren måste byta det vid första inloggningen.`
           : 'Användare skapad!',
         { duration: temporary_password ? 15000 : 3000 }
       );
