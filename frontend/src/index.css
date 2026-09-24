@@ -39,10 +39,19 @@
   }
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/*
+  Tailwind v4 draws borders in currentColor by default; the app was designed for
+  v3's light-gray default. This is the compatibility rule from the v4 upgrade guide.
+  Keep global resets inside @layer base - unlayered rules override all utilities.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
 }
 
 body {
