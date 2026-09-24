@@ -60,7 +60,7 @@ export default function PointActionModal({
     setIsUpdating(true);
     setIsUploading(true);
     try {
-      await uploadPointImage(point.id, file);
+      await uploadPointImage(point.id, file, notes);
     } catch (error) {
       console.error('Error uploading point image:', error);
       toast.error('Kunde inte spara bilden. Status ändrades inte.');
@@ -70,7 +70,9 @@ export default function PointActionModal({
     }
     setIsUploading(false);
 
-    await onUpdateStatus('UPPTAGEN', notes || undefined);
+    const savedNote = notes;
+    setNotes(''); // the note is stored with the photo; start empty next time
+    await onUpdateStatus('UPPTAGEN', savedNote || undefined);
     setIsUpdating(false);
     onClose();
   };
@@ -203,18 +205,24 @@ export default function PointActionModal({
             ) : (
               <div className="grid grid-cols-3 gap-2">
                 {images.map((image) => (
-                  <a
-                    key={image.id}
-                    href={image.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group relative block aspect-square overflow-hidden rounded-lg bg-gray-100"
-                  >
-                    <img src={image.url} alt="Bild av punkten" className="h-full w-full object-cover transition group-hover:scale-105" />
-                    <span className="absolute inset-x-0 bottom-0 bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
-                      {format(new Date(image.created_at), 'd MMM HH:mm', { locale: sv })}
-                    </span>
-                  </a>
+                  <div key={image.id} className="flex flex-col gap-1">
+                    <a
+                      href={image.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group relative block aspect-square overflow-hidden rounded-lg bg-gray-100"
+                    >
+                      <img src={image.url} alt="Bild av punkten" className="h-full w-full object-cover transition group-hover:scale-105" />
+                      <span className="absolute inset-x-0 bottom-0 bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
+                        {format(new Date(image.created_at), 'd MMM HH:mm', { locale: sv })}
+                      </span>
+                    </a>
+                    {image.note && (
+                      <p className="text-[11px] leading-snug text-gray-600 break-words line-clamp-3" title={image.note}>
+                        {image.note}
+                      </p>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -231,13 +239,14 @@ export default function PointActionModal({
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Noteringar (valfritt)
+              Noteringar (valfritt, sparas med bilden)
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               rows={3}
+              maxLength={1000}
               placeholder="Lägg till noteringar..."
             />
           </div>

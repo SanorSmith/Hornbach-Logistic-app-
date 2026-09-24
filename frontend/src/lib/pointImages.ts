@@ -11,12 +11,14 @@ export interface PointImage {
   id: string;
   created_at: string;
   url: string;
+  note: string | null;
 }
 
 interface PointImageRow {
   id: string;
   storage_path: string;
   created_at: string;
+  note: string | null;
 }
 
 // Phone photos are often 5-10 MB; scale down to keep uploads fast and small.
@@ -41,7 +43,7 @@ async function compressImage(file: File, maxSize = 1600, quality = 0.8): Promise
 async function listRows(pointId: string): Promise<PointImageRow[]> {
   const { data, error } = await supabase
     .from('point_images' as never)
-    .select('id, storage_path, created_at')
+    .select('id, storage_path, created_at, note')
     .eq('point_id', pointId)
     .order('created_at', { ascending: false });
 
@@ -49,8 +51,8 @@ async function listRows(pointId: string): Promise<PointImageRow[]> {
   return (data ?? []) as unknown as PointImageRow[];
 }
 
-/** Uploads a photo for a point and removes everything beyond the newest 3. */
-export async function uploadPointImage(pointId: string, file: File): Promise<void> {
+/** Uploads a photo (with optional note) for a point and removes everything beyond the newest 3. */
+export async function uploadPointImage(pointId: string, file: File, note?: string): Promise<void> {
   const blob = await compressImage(file);
   const path = `${pointId}/${Date.now()}-${crypto.randomUUID()}.jpg`;
 
@@ -61,7 +63,7 @@ export async function uploadPointImage(pointId: string, file: File): Promise<voi
 
   const { error: insertError } = await supabase
     .from('point_images' as never)
-    .insert({ point_id: pointId, storage_path: path } as never);
+    .insert({ point_id: pointId, storage_path: path, note: note?.trim() || null } as never);
   if (insertError) {
     await supabase.storage.from(BUCKET).remove([path]);
     throw insertError;
@@ -93,5 +95,6 @@ export async function getPointImages(pointId: string): Promise<PointImage[]> {
     id: row.id,
     created_at: row.created_at,
     url: data?.[i]?.signedUrl ?? '',
+    note: row.note,
   }));
 }
