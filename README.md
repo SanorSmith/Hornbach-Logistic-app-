@@ -72,10 +72,11 @@ A complete full-stack logistics management web application for tracking and mana
    ```
 
 2. **Configure Environment**
-   - The `.env` file already contains your Supabase credentials:
+   - Copy `frontend/.env.example` to `frontend/.env` and fill in your Supabase credentials
+     (Supabase → Project Settings → API). `.env` files are git-ignored - never commit them.
    ```env
-   VITE_SUPABASE_URL=https://tgrgqulnmwgcowlrrkfv.supabase.co
-   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-public-key
    ```
 
 3. **Start Development Server**
