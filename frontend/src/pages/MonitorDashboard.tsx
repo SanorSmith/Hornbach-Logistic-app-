@@ -5,13 +5,15 @@ import { Home, Activity, AlertTriangle, TrendingUp, Monitor as MonitorIcon, Refr
 import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
 import RedPointGrid from '../components/redpoints/RedPointGrid';
-import { PointStatus } from '../types';
+import PointImagesViewer from '../components/redpoints/PointImagesViewer';
+import { PointStatus, RedPoint } from '../types';
 
 export default function MonitorDashboard() {
   const navigate = useNavigate();
   const { points } = useRedPoints();
   const { assignments } = useDepartmentAssignments();
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [viewedPoint, setViewedPoint] = useState<RedPoint | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -147,13 +149,22 @@ export default function MonitorDashboard() {
 
         {/* Grid View */}
         <div className="bg-gray-800 rounded-lg p-6">
-          <h2 className="text-xl font-bold mb-4">Alla Punkter (Endast Visning)</h2>
-          <RedPointGrid 
-            points={points} 
-            onPointClick={() => {}} // Read-only, no click action
+          <h2 className="text-xl font-bold mb-1">Alla Punkter (Endast Visning)</h2>
+          <p className="text-sm text-gray-400 mb-4">Klicka på en punkt för att se de senaste bilderna.</p>
+          <RedPointGrid
+            points={points}
+            onPointClick={setViewedPoint} // read-only: shows the latest photos
             assignments={assignments}
           />
         </div>
+
+        {viewedPoint && (
+          <PointImagesViewer
+            point={viewedPoint}
+            label={assignments[viewedPoint.id] || String(viewedPoint.point_number)}
+            onClose={() => setViewedPoint(null)}
+          />
+        )}
 
         {/* System Info */}
         <div className="mt-6 bg-gray-800 rounded-lg p-4">

@@ -261,6 +261,7 @@ export default function DepartmentDashboard() {
           onClose={() => setSelectedPoint(null)}
           onUpdateStatus={handleUpdateStatus}
           allowedActions={['LEDIG', 'UPPTAGEN', 'SKRAP', 'KUNDORDER']}
+          disabledActions={['UPPTAGEN']}
         />
       )}
 
