@@ -11,6 +11,9 @@ import QRGenerator from '../components/qr/QRGenerator';
 import { supabase } from '../lib/supabase';
 import { downloadQrSheet } from '../lib/qrPdf';
 import toast from 'react-hot-toast';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import { findPointByScan } from '../lib/scanLookup';
+import ScannerReadyBadge from '../components/redpoints/ScannerReadyBadge';
 
 export default function DepartmentDashboard() {
   const navigate = useNavigate();
@@ -79,6 +82,25 @@ export default function DepartmentDashboard() {
     setQrPointId(pointId);
     setShowQRGenerator(true);
   };
+
+  // Zebra / hardware scanner: open the scanned point. If it belongs to another
+  // department, switch the view to that department first.
+  const handleScan = (code: string) => {
+    const result = findPointByScan(points, assignments, code);
+    if ('error' in result) {
+      toast.error(result.error);
+      return;
+    }
+    const point = result.point;
+    const pointDepartment = assignedDepartments[point.id] ?? point.department_id;
+    if (pointDepartment && pointDepartment !== selectedDepartment && departments.some((d) => d.id === pointDepartment)) {
+      setSelectedDepartment(pointDepartment);
+    }
+    toast.success(`Punkt ${assignments[point.id]?.trim() || point.point_number} scannad!`);
+    setSelectedPoint(point);
+  };
+
+  useBarcodeScanner(handleScan, !showQRGenerator);
 
   const [downloadingQr, setDownloadingQr] = useState<'department' | 'all' | null>(null);
 
@@ -167,6 +189,8 @@ export default function DepartmentDashboard() {
             </div>
             
             <div className="flex items-center gap-3">
+              <ScannerReadyBadge />
+
               <button
                 onClick={downloadAllQRCodes}
                 disabled={downloadingQr !== null}
