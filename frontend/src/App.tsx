@@ -12,6 +12,7 @@ import Login from './pages/Login';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { useAuthListener } from './hooks/useAuth';
 import { ROUTE_ROLES } from './lib/access';
+import InstallPrompt from './components/pwa/InstallPrompt';
 
 function App() {
   useAuthListener();
@@ -42,6 +43,7 @@ function App() {
           },
         }}
       />
+      <InstallPrompt />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<ProtectedRoute><DashboardSelector /></ProtectedRoute>} />
