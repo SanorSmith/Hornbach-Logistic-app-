@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RedPoint, PointStatus } from '../../types';
-import { X, Package, Trash2, CheckCircle, Camera, Loader2 } from 'lucide-react';
+import { X, Package, Trash2, CheckCircle, Camera, Loader2, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { uploadPointImage } from '../../lib/pointImages';
+import { getLimitedChangeWait, isLimitedChange, RATE_LIMIT_MESSAGE } from '../../lib/rateLimit';
 import PointImageGallery from './PointImageGallery';
 import { usePointDetails } from '../../hooks/usePointDetails';
 import { getStatusLabel } from '../../utils/statusColors';
@@ -34,7 +35,38 @@ export default function PointActionModal({
   const cameraInput = useRef<HTMLInputElement>(null);
   const details = usePointDetails(point);
 
+  // Anti-cheating limit (see lib/rateLimit.ts): count down while blocked.
+  const [waitUntil, setWaitUntil] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const remaining = waitUntil ? Math.max(0, Math.ceil((waitUntil - now) / 1000)) : 0;
+
+  const startWait = (seconds: number) => {
+    setNow(Date.now());
+    setWaitUntil(Date.now() + seconds * 1000);
+  };
+
+  useEffect(() => {
+    getLimitedChangeWait().then((seconds) => {
+      if (seconds > 0) startWait(seconds);
+    });
+  }, [point.id]);
+
+  useEffect(() => {
+    if (!waitUntil) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [waitUntil]);
+
+  const isRateLimited = (status: PointStatus) => remaining > 0 && isLimitedChange(point.status, status);
+
+  const showRateLimit = (seconds: number) =>
+    toast.error(`${RATE_LIMIT_MESSAGE} Försök igen om ${seconds} s.`, { duration: 6000 });
+
   const handleUpdateStatus = async (newStatus: PointStatus) => {
+    if (isRateLimited(newStatus)) {
+      showRateLimit(remaining);
+      return;
+    }
     // Marking as UPPTAGEN requires a photo: open the camera first.
     if (newStatus === 'UPPTAGEN') {
       cameraInput.current?.click();
@@ -52,6 +84,17 @@ export default function PointActionModal({
     if (!file) return; // camera cancelled - status is not changed
 
     setIsUpdating(true);
+
+    // Re-check the limit before uploading, so no photo is saved for a change
+    // the database would refuse.
+    const wait = isLimitedChange(point.status, 'UPPTAGEN') ? await getLimitedChangeWait() : 0;
+    if (wait > 0) {
+      startWait(wait);
+      showRateLimit(wait);
+      setIsUpdating(false);
+      return;
+    }
+
     setIsUploading(true);
     try {
       await uploadPointImage(point.id, file, notes);
@@ -98,13 +141,14 @@ export default function PointActionModal({
     const config = configs[status];
     const Icon = config.icon;
     const isDisabled = disabledActions.includes(status);
+    const limited = isRateLimited(status);
 
     return (
       <button
         key={status}
         onClick={() => handleUpdateStatus(status)}
-        disabled={isUpdating || isDisabled}
-        title={isDisabled ? 'Inte tillgänglig på den här sidan' : undefined}
+        disabled={isUpdating || isDisabled || limited}
+        title={isDisabled ? 'Inte tillgänglig på den här sidan' : limited ? RATE_LIMIT_MESSAGE : undefined}
         className={`
           w-full py-3 px-4 rounded-lg text-white font-semibold
           flex items-center justify-center gap-2
@@ -117,6 +161,11 @@ export default function PointActionModal({
           <>
             <Loader2 size={20} className="animate-spin" />
             Sparar bild...
+          </>
+        ) : limited ? (
+          <>
+            <Clock size={20} />
+            {getStatusLabel(status)} · vänta {remaining} s
           </>
         ) : (
           <>
