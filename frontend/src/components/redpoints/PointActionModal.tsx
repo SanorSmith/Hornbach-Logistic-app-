@@ -163,12 +163,6 @@ export default function PointActionModal({
                 <span className="text-gray-600">Avdelning:</span>
                 <span className="ml-2 font-semibold">{details.departmentName ?? 'Ej tilldelad'}</span>
               </div>
-              {details.name && (
-                <div>
-                  <span className="text-gray-600">Punkt-ID:</span>
-                  <span className="ml-2">#{point.point_number}</span>
-                </div>
-              )}
               {details.departmentLocation && (
                 <div>
                   <span className="text-gray-600">Plats:</span>
