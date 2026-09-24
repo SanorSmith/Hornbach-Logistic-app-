@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, Building2, QrCode, Download, MapPin } from 'lucide-react';
+import { Home, Building2, QrCode, Download, MapPin, Loader2 } from 'lucide-react';
 import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
 import { RedPoint, PointStatus } from '../types';
@@ -9,6 +9,8 @@ import RedPointCard from '../components/redpoints/RedPointCard';
 import PointActionModal from '../components/redpoints/PointActionModal';
 import QRGenerator from '../components/qr/QRGenerator';
 import { supabase } from '../lib/supabase';
+import { downloadQrSheet } from '../lib/qrPdf';
+import toast from 'react-hot-toast';
 
 export default function DepartmentDashboard() {
   const navigate = useNavigate();
@@ -78,9 +80,39 @@ export default function DepartmentDashboard() {
     setShowQRGenerator(true);
   };
 
-  const downloadAllQRCodes = () => {
-    // This would generate a PDF with all QR codes for the department
-    alert('Funktion för att ladda ner alla QR-koder kommer snart!');
+  const [downloadingQr, setDownloadingQr] = useState(false);
+
+  // One A4 page with the QR codes of every point shown for the selected department.
+  const downloadAllQRCodes = async () => {
+    if (departmentPoints.length === 0) {
+      toast.error('Inga punkter att skriva ut för den här avdelningen');
+      return;
+    }
+
+    const heading =
+      selectedDepartment === 'UNASSIGNED'
+        ? 'QR-koder – otilldelade punkter'
+        : `QR-koder – ${currentDepartment?.name ?? 'Avdelning'}`;
+    const items = [...departmentPoints]
+      .sort((a, b) => a.point_number - b.point_number)
+      .map((p) => ({
+        code: `RP-${String(p.point_number).padStart(3, '0')}`,
+        title: assignments[p.id] || `Punkt ${p.point_number}`,
+      }));
+    const fileSlug = (selectedDepartment === 'UNASSIGNED' ? 'otilldelade' : currentDepartment?.name ?? 'avdelning')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9åäö]+/g, '-');
+
+    setDownloadingQr(true);
+    try {
+      await downloadQrSheet(items, heading, `qr-koder-${fileSlug}.pdf`);
+    } catch (error) {
+      console.error('Error creating QR PDF:', error);
+      toast.error('Kunde inte skapa PDF');
+    } finally {
+      setDownloadingQr(false);
+    }
   };
 
   return (
@@ -106,9 +138,10 @@ export default function DepartmentDashboard() {
             <div className="flex items-center gap-3">
               <button
                 onClick={downloadAllQRCodes}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                disabled={downloadingQr}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-60"
               >
-                <Download size={20} />
+                {downloadingQr ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
                 <span className="hidden sm:inline">Ladda ner QR-koder</span>
               </button>
               
