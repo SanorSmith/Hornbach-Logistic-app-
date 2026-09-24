@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useRedPointsStore } from '../store/redPointsStore';
 import { RedPoint } from '../types';
 import toast from 'react-hot-toast';
+import { RATE_LIMIT_MESSAGE, rateLimitSeconds } from '../lib/rateLimit';
 
 export function useRedPoints() {
   const { points, setPoints, updatePoint, setLoading } = useRedPointsStore();
@@ -88,7 +89,12 @@ export function useRedPoints() {
       return true;
     } catch (error: any) {
       console.error('Error updating status:', error);
-      toast.error('Fel vid uppdatering av status');
+      const wait = rateLimitSeconds(error);
+      if (wait !== null) {
+        toast.error(`${RATE_LIMIT_MESSAGE} Försök igen om ${wait} s.`, { duration: 6000 });
+      } else {
+        toast.error('Fel vid uppdatering av status');
+      }
       return null;
     }
   };
