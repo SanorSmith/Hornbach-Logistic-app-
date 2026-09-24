@@ -7,6 +7,7 @@ import TeamLeaderDashboard from './pages/TeamLeaderDashboard';
 import MonitorDashboard from './pages/MonitorDashboard';
 import DepartmentDashboard from './pages/DepartmentDashboard';
 import TeamManagement from './pages/TeamManagement';
+import ReportsPage from './pages/ReportsPage';
 import Login from './pages/Login';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { useAuthListener } from './hooks/useAuth';
@@ -50,6 +51,7 @@ function App() {
         <Route path="/monitor" element={<ProtectedRoute roles={ROUTE_ROLES.monitor}><MonitorDashboard /></ProtectedRoute>} />
         <Route path="/department" element={<ProtectedRoute roles={ROUTE_ROLES.department}><DepartmentDashboard /></ProtectedRoute>} />
         <Route path="/team" element={<ProtectedRoute roles={ROUTE_ROLES.team}><TeamManagement /></ProtectedRoute>} />
+        <Route path="/reports" element={<ProtectedRoute roles={ROUTE_ROLES.reports}><ReportsPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
