@@ -1,0 +1,22 @@
+name: Redeploy Vercel
+
+# Manually trigger a production redeploy of the frontend on Vercel.
+# Requires the repository secret VERCEL_DEPLOY_HOOK (a Vercel Deploy Hook URL
+# for the main branch: Vercel -> Project Settings -> Git -> Deploy Hooks).
+on:
+  workflow_dispatch:
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deploy hook
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$VERCEL_DEPLOY_HOOK" ]; then
+            echo "::error::Repository secret VERCEL_DEPLOY_HOOK is not set"
+            exit 1
+          fi
+          curl --fail --silent --show-error -X POST "$VERCEL_DEPLOY_HOOK"
+          echo "Vercel redeploy triggered"
