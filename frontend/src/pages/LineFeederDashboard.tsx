@@ -7,8 +7,8 @@ import { RedPoint, PointStatus } from '../types';
 import RedPointGrid from '../components/redpoints/RedPointGrid';
 import PointActionModal from '../components/redpoints/PointActionModal';
 import QRScanner from '../components/qr/QRScanner';
-import { QrCode, Home, Filter } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { QrCode, Home, Filter, ScanLine } from 'lucide-react';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import toast from 'react-hot-toast';
 
 export default function LineFeederDashboard() {
@@ -19,11 +19,6 @@ export default function LineFeederDashboard() {
   const [showScanner, setShowScanner] = useState(false);
   const [filterStatus, setFilterStatus] = useState<PointStatus | 'ALL'>('ALL');
 
-  const handleTestClick = () => {
-    console.log('Button clicked!');
-    alert('Button works!');
-  };
-
   const handlePointClick = (point: RedPoint) => {
     setSelectedPoint(point);
   };
@@ -33,74 +28,47 @@ export default function LineFeederDashboard() {
     await updatePointStatus(selectedPoint.id, status, notes);
   };
 
-  const handleQRScan = async (qrCode: string) => {
-    try {
-      console.log('QR Scanner v0.0.2 - Scanning QR code:', qrCode);
-      
-      const { data, error } = await supabase
-        .from('red_points')
-        .select('*')
-        .eq('qr_code', qrCode)
-        .single();
+  // Finds the point for a scanned value (camera or hardware scanner such as a
+  // Zebra). Accepts "RP-003", anything containing it (e.g. a link), or the
+  // point's department name such as "KASSA" / "D1".
+  const handleQRScan = (qrCode: string) => {
+    const code = qrCode.trim();
+    let point: RedPoint | undefined;
 
-      if (error) {
-        console.error('Database error:', error);
-        if (error.code === 'PGRST116') {
-          // No rows returned - QR code not found
-          // Try to extract point number from QR code (fallback)
-          const pointNumberMatch = qrCode.match(/RP-(\d{3})/);
-          if (pointNumberMatch) {
-            const pointNumber = parseInt(pointNumberMatch[1]);
-            try {
-              const { data: pointData, error: pointError } = await supabase
-                .from('red_points')
-                .select('*')
-                .eq('point_number', pointNumber)
-                .single();
+    const rpMatch = code.match(/RP-(\d{1,3})/i);
+    if (rpMatch) {
+      const pointNumber = parseInt(rpMatch[1], 10);
+      point = points.find((p) => p.point_number === pointNumber);
+    }
 
-              if (pointError) throw pointError;
-              
-              if (pointData) {
-                // @ts-ignore - Supabase type inference issue
-                toast.success(`Punkt ${pointData.point_number} hittad via nummer!`);
-                // Close scanner first
-                setShowScanner(false);
-                // Small delay to ensure scanner is closed before opening action modal
-                setTimeout(() => {
-                  // @ts-ignore - Supabase type inference issue
-                  setSelectedPoint(pointData);
-                }, 100);
-                return;
-              }
-            } catch (fallbackError) {
-              console.error('Fallback search failed:', fallbackError);
-            }
-          }
-          toast.error(`QR-kod "${qrCode}" hittades inte i systemet`);
-        } else {
-          toast.error('Kunde inte söka efter QR-kod');
-        }
+    if (!point) {
+      point = points.find((p) => p.qr_code?.toLowerCase() === code.toLowerCase());
+    }
+
+    if (!point) {
+      const byName = points.filter((p) => assignments[p.id]?.toLowerCase() === code.toLowerCase());
+      if (byName.length === 1) {
+        point = byName[0];
+      } else if (byName.length > 1) {
+        toast.error(`"${code}" finns i flera avdelningar – skanna punktens QR-kod`);
         return;
       }
-
-      if (data) {
-        // @ts-ignore - Supabase type inference issue
-        toast.success(`Punkt ${data.point_number} scannad!`);
-        // Close scanner first
-        setShowScanner(false);
-        // Small delay to ensure scanner is closed before opening action modal
-        setTimeout(() => {
-          // @ts-ignore - Supabase type inference issue
-          setSelectedPoint(data);
-        }, 100);
-      } else {
-        toast.error('Ogiltig QR-kod');
-      }
-    } catch (error: any) {
-      console.error('QR scan error:', error);
-      toast.error('Kunde inte hitta punkt');
     }
+
+    if (!point) {
+      toast.error(`QR-kod "${code}" hittades inte i systemet`);
+      return;
+    }
+
+    const found = point;
+    toast.success(`Punkt ${assignments[found.id] || found.point_number} scannad!`);
+    setShowScanner(false);
+    // Small delay so the camera scanner is closed before the point dialog opens.
+    setTimeout(() => setSelectedPoint(found), 100);
   };
+
+  // Hardware scanners (Zebra TC2x etc.) type the code like a keyboard.
+  useBarcodeScanner(handleQRScan, !showScanner);
 
   const filteredPoints = filterStatus === 'ALL'
     ? points
@@ -121,7 +89,7 @@ export default function LineFeederDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">
-                Linefeedr Dashboard
+                LineFeeder Dashboard
               </h1>
               <p className="text-sm text-gray-600">
                 Hantera röda punkter och materialflöde
@@ -129,12 +97,13 @@ export default function LineFeederDashboard() {
             </div>
             
             <div className="flex items-center gap-3">
-              <button
-                onClick={handleTestClick}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+              <span
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 text-green-700 text-sm"
+                title="Skanna en punkts QR-kod med Zebra-skannern för att öppna punkten"
               >
-                TEST
-              </button>
+                <ScanLine size={16} />
+                Skanner redo
+              </span>
               
               <button
                 onClick={() => setShowScanner(true)}
