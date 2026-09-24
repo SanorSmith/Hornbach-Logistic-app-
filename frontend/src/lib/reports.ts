@@ -21,7 +21,7 @@ import { supabase } from './supabase';
 
 export const METRICS = [
   { key: 'pallets_placed', label: 'Pallar placerade', short: 'Placerade' },
-  { key: 'pallets_picked', label: 'Pallar hämtade', short: 'Hämtade' },
+  { key: 'pallets_picked', label: 'Pallar plockade', short: 'Plockade' },
   { key: 'skrap_reported', label: 'Skräp rapporterat', short: 'Skräp rapp.' },
   { key: 'skrap_removed', label: 'Skräp borttaget', short: 'Skräp bort' },
   { key: 'kundorder_reported', label: 'Kundorder', short: 'Kundorder' },
