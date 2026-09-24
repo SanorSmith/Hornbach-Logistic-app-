@@ -15,15 +15,11 @@ export default function DepartmentDashboard() {
   const { points, updatePointStatus } = useRedPoints();
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [departments, setDepartments] = useState<{ id: string; name: string; location: string }[]>([]);
-  const { assignments } = useDepartmentAssignments();
+  const { assignments, assignedDepartments } = useDepartmentAssignments();
   const [selectedPoint, setSelectedPoint] = useState<RedPoint | null>(null);
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [qrPointNumber, setQrPointNumber] = useState<number | null>(null);
   const [qrPointId, setQrPointId] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchDepartments();
-  }, []);
 
   useEffect(() => {
     fetchDepartments();
@@ -48,18 +44,18 @@ export default function DepartmentDashboard() {
     }
   };
 
-  const departmentPoints = points.filter(p => {
-  // Special case: show all unassigned points
-  if (selectedDepartment === 'UNASSIGNED') {
-    return !assignments[p.id];
-  }
-  
-  // Show points that are assigned to this department OR belong to this department
-  const isAssignedToDept = assignments[p.id];
-  const belongsToDept = p.department_id === selectedDepartment;
-  return isAssignedToDept || belongsToDept;
-});
-  
+  const departmentPoints = points.filter((p) => {
+    // Special case: show all unassigned points
+    if (selectedDepartment === 'UNASSIGNED') {
+      return !assignments[p.id];
+    }
+
+    // A point belongs to the department it is assigned to; points without an
+    // assignment fall back to their own department_id.
+    const pointDepartment = assignedDepartments[p.id] ?? p.department_id;
+    return pointDepartment === selectedDepartment;
+  });
+
   const statusCounts = departmentPoints.reduce((acc, point) => {
     acc[point.status] = (acc[point.status] || 0) + 1;
     return acc;
