@@ -7,8 +7,10 @@ import { RedPoint, PointStatus } from '../types';
 import RedPointGrid from '../components/redpoints/RedPointGrid';
 import PointActionModal from '../components/redpoints/PointActionModal';
 import QRScanner from '../components/qr/QRScanner';
-import { QrCode, Home, Filter, ScanLine } from 'lucide-react';
+import { QrCode, Home, Filter } from 'lucide-react';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import { findPointByScan } from '../lib/scanLookup';
+import ScannerReadyBadge from '../components/redpoints/ScannerReadyBadge';
 import toast from 'react-hot-toast';
 
 export default function LineFeederDashboard() {
@@ -28,40 +30,15 @@ export default function LineFeederDashboard() {
     return (await updatePointStatus(selectedPoint.id, status, notes)) === true;
   };
 
-  // Finds the point for a scanned value (camera or hardware scanner such as a
-  // Zebra). Accepts "RP-003", anything containing it (e.g. a link), or the
-  // point's department name such as "KASSA" / "D1".
+  // Camera or hardware scanner (Zebra): open the scanned point.
   const handleQRScan = (qrCode: string) => {
-    const code = qrCode.trim();
-    let point: RedPoint | undefined;
-
-    const rpMatch = code.match(/RP-(\d{1,3})/i);
-    if (rpMatch) {
-      const pointNumber = parseInt(rpMatch[1], 10);
-      point = points.find((p) => p.point_number === pointNumber);
-    }
-
-    if (!point) {
-      point = points.find((p) => p.qr_code?.toLowerCase() === code.toLowerCase());
-    }
-
-    if (!point) {
-      const byName = points.filter((p) => assignments[p.id]?.toLowerCase() === code.toLowerCase());
-      if (byName.length === 1) {
-        point = byName[0];
-      } else if (byName.length > 1) {
-        toast.error(`"${code}" finns i flera avdelningar – skanna punktens QR-kod`);
-        return;
-      }
-    }
-
-    if (!point) {
-      toast.error(`QR-kod "${code}" hittades inte i systemet`);
+    const result = findPointByScan(points, assignments, qrCode);
+    if ('error' in result) {
+      toast.error(result.error);
       return;
     }
-
-    const found = point;
-    toast.success(`Punkt ${assignments[found.id] || found.point_number} scannad!`);
+    const found = result.point;
+    toast.success(`Punkt ${assignments[found.id]?.trim() || found.point_number} scannad!`);
     setShowScanner(false);
     // Small delay so the camera scanner is closed before the point dialog opens.
     setTimeout(() => setSelectedPoint(found), 100);
@@ -97,13 +74,7 @@ export default function LineFeederDashboard() {
             </div>
             
             <div className="flex items-center gap-3">
-              <span
-                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 text-green-700 text-sm"
-                title="Skanna en punkts QR-kod med Zebra-skannern för att öppna punkten"
-              >
-                <ScanLine size={16} />
-                Skanner redo
-              </span>
+              <ScannerReadyBadge />
               
               <button
                 onClick={() => setShowScanner(true)}

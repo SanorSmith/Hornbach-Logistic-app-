@@ -61,9 +61,12 @@ export async function downloadQrSheet(items: QrSheetItem[], heading: string, fil
   const cellH = (areaH - GAP * (rows - 1)) / rows;
   const titleSize = Math.max(8, Math.min(22, qr * 0.28));
 
+  // Render each code at print resolution (300 dpi) for its size on the page;
+  // a fixed large size made the PDF tens of megabytes.
+  const pixels = Math.max(120, Math.ceil((qr / 25.4) * 300));
   const images = await Promise.all(
     items.map((item) =>
-      QRCode.toDataURL(item.code, { errorCorrectionLevel: 'H', margin: 1, width: 600 })
+      QRCode.toDataURL(item.code, { errorCorrectionLevel: 'H', margin: 1, width: pixels })
     )
   );
 
@@ -82,7 +85,7 @@ export async function downloadQrSheet(items: QrSheetItem[], heading: string, fil
     const labelH = Math.min(cellH * 0.22, 14);
     const qrX = x + (cellW - qr) / 2;
     const qrY = y + (cellH - labelH - qr) / 2;
-    doc.addImage(images[i], 'PNG', qrX, qrY, qr, qr);
+    doc.addImage(images[i], 'PNG', qrX, qrY, qr, qr, undefined, 'FAST');
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(titleSize);
