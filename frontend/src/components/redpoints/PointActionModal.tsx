@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RedPoint, PointStatus } from '../../types';
-import { X, Package, Trash2, CheckCircle, Camera, Loader2, ImageOff } from 'lucide-react';
-import { format } from 'date-fns';
-import { sv } from 'date-fns/locale';
+import { X, Package, Trash2, CheckCircle, Camera, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getPointImages, uploadPointImage, MAX_IMAGES_PER_POINT, PointImage } from '../../lib/pointImages';
+import { uploadPointImage } from '../../lib/pointImages';
+import PointImageGallery from './PointImageGallery';
 import { getStatusLabel } from '../../utils/statusColors';
 import StatusCircle from './StatusCircle';
 
@@ -14,6 +13,8 @@ interface PointActionModalProps {
   onClose: () => void;
   onUpdateStatus: (status: PointStatus, notes?: string) => Promise<void>;
   allowedActions: PointStatus[];
+  /** Actions shown but not clickable on this page (e.g. UPPTAGEN on Avdelning). */
+  disabledActions?: PointStatus[];
 }
 
 export default function PointActionModal({
@@ -21,24 +22,12 @@ export default function PointActionModal({
   onClose,
   onUpdateStatus,
   allowedActions,
+  disabledActions = [],
 }: PointActionModalProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [notes, setNotes] = useState('');
-  const [images, setImages] = useState<PointImage[]>([]);
-  const [imagesLoading, setImagesLoading] = useState(true);
   const cameraInput = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    getPointImages(point.id)
-      .then((result) => !cancelled && setImages(result))
-      .catch((error) => console.error('Error loading point images:', error))
-      .finally(() => !cancelled && setImagesLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [point.id]);
 
   const handleUpdateStatus = async (newStatus: PointStatus) => {
     // Marking as UPPTAGEN requires a photo: open the camera first.
@@ -103,12 +92,14 @@ export default function PointActionModal({
 
     const config = configs[status];
     const Icon = config.icon;
+    const isDisabled = disabledActions.includes(status);
 
     return (
       <button
         key={status}
         onClick={() => handleUpdateStatus(status)}
-        disabled={isUpdating}
+        disabled={isUpdating || isDisabled}
+        title={isDisabled ? 'Inte tillgänglig på den här sidan' : undefined}
         className={`
           w-full py-3 px-4 rounded-lg text-white font-semibold
           flex items-center justify-center gap-2
@@ -185,47 +176,7 @@ export default function PointActionModal({
           </div>
 
           <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">Senaste bilder</span>
-              <span className="text-xs text-gray-500">
-                {images.length}/{MAX_IMAGES_PER_POINT}
-              </span>
-            </div>
-            {imagesLoading ? (
-              <div className="grid grid-cols-3 gap-2">
-                {Array.from({ length: MAX_IMAGES_PER_POINT }).map((_, i) => (
-                  <div key={i} className="aspect-square rounded-lg bg-gray-100 animate-pulse" />
-                ))}
-              </div>
-            ) : images.length === 0 ? (
-              <div className="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 p-3 text-sm text-gray-500">
-                <ImageOff size={18} />
-                Inga bilder ännu. En bild tas när punkten markeras som upptagen.
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2">
-                {images.map((image) => (
-                  <div key={image.id} className="flex flex-col gap-1">
-                    <a
-                      href={image.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group relative block aspect-square overflow-hidden rounded-lg bg-gray-100"
-                    >
-                      <img src={image.url} alt="Bild av punkten" className="h-full w-full object-cover transition group-hover:scale-105" />
-                      <span className="absolute inset-x-0 bottom-0 bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
-                        {format(new Date(image.created_at), 'd MMM HH:mm', { locale: sv })}
-                      </span>
-                    </a>
-                    {image.note && (
-                      <p className="text-[11px] leading-snug text-gray-600 break-words line-clamp-3" title={image.note}>
-                        {image.note}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            <PointImageGallery pointId={point.id} />
           </div>
 
           <input
