@@ -14,6 +14,14 @@ interface DepartmentPoint {
   pointId: string;
   departmentNumber: string;
   globalNumber: number;
+  // Set when the point is already assigned to a different department.
+  otherDepartment?: { name: string; number: string };
+}
+
+interface AssignmentRow {
+  point_id: string;
+  department_id: string;
+  department_number: string;
 }
 
 export default function AssignPointsModal({ isOpen, onClose, onSuccess, departments }: AssignPointsModalProps) {
@@ -40,21 +48,34 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
         .select('id, point_number, department_id')
         .order('point_number');
 
-      // @ts-ignore - Supabase type inference issue
-      const { data: deptAssignments } = await supabase
+      // Load every assignment so points owned by other departments are shown as such.
+      const { data: allAssignments, error: assignmentsError } = await supabase
         .from('department_point_assignments')
-        .select('point_id, department_number')
-        .eq('department_id', selectedDepartment);
+        .select('point_id, department_id, department_number');
 
-      const assignmentsMap = (deptAssignments || []).reduce((acc, assignment) => {
-        acc[assignment.point_id] = assignment.department_number;
-        return acc;
-      }, {} as Record<string, string>);
+      if (assignmentsError) throw assignmentsError;
 
-      const departmentPoints: DepartmentPoint[] = (redPoints || []).map(point => ({
+      const rows = (allAssignments || []) as AssignmentRow[];
+      const departmentNames = Object.fromEntries(departments.map((d) => [d.id, d.name]));
+
+      const assignmentsMap: Record<string, string> = {};
+      const otherDepartments: Record<string, { name: string; number: string }> = {};
+      for (const row of rows) {
+        if (row.department_id === selectedDepartment) {
+          assignmentsMap[row.point_id] = row.department_number;
+        } else {
+          otherDepartments[row.point_id] = {
+            name: departmentNames[row.department_id] ?? 'annan avdelning',
+            number: row.department_number,
+          };
+        }
+      }
+
+      const departmentPoints: DepartmentPoint[] = ((redPoints || []) as { id: string; point_number: number }[]).map((point) => ({
         pointId: point.id,
         departmentNumber: assignmentsMap[point.id] || '',
         globalNumber: point.point_number,
+        otherDepartment: otherDepartments[point.id],
       }));
 
       setPoints(departmentPoints);
@@ -78,8 +99,9 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
     const newAssignments = { ...assignments };
     let currentNum = startNum;
     
-    const filteredPoints = points.filter(p => 
-      p.globalNumber >= startNum && p.globalNumber <= endNum
+    // Skip points that already belong to another department.
+    const filteredPoints = points.filter(p =>
+      p.globalNumber >= startNum && p.globalNumber <= endNum && !p.otherDepartment
     );
     
     filteredPoints.forEach(point => {
@@ -93,35 +115,33 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
   const saveAssignments = async () => {
     setSaving(true);
     try {
-      // Delete existing assignments for this department
-      // @ts-ignore - Supabase type inference issue
-      await supabase
-        .from('department_point_assignments')
-        .delete()
-        .eq('department_id', selectedDepartment);
+      const payload = points
+        .filter((p) => !p.otherDepartment && (assignments[p.pointId] ?? '').trim() !== '')
+        .map((p) => ({ point_id: p.pointId, department_number: assignments[p.pointId].trim() }));
 
-      // Insert new assignments
-      const newAssignments = Object.entries(assignments)
-        .filter(([_, deptNum]) => deptNum !== '')
-        .map(([pointId, deptNum]) => ({
-          department_id: selectedDepartment,
-          point_id: pointId,
-          department_number: deptNum,
-        }));
+      // Replaces this department's assignments in one transaction (see
+      // supabase/migrations/*_assignment_integrity.sql).
+      const { error } = await supabase.rpc('save_department_assignments' as never, {
+        p_department_id: selectedDepartment,
+        p_assignments: payload,
+      } as never);
 
-      if (newAssignments.length > 0) {
-        // @ts-ignore - Supabase type inference issue
-        await supabase
-          .from('department_point_assignments')
-          .insert(newAssignments);
-      }
+      if (error) throw error;
 
       toast.success('Punkttilldelningar sparade!');
       onSuccess();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving assignments:', error);
-      toast.error('Fel vid sparande av tilldelningar');
+      if (error?.code === '23505') {
+        toast.error(
+          error.message?.includes('department_number')
+            ? 'Samma avdelningsnummer används för flera punkter'
+            : 'En punkt är redan tilldelad en annan avdelning'
+        );
+      } else {
+        toast.error('Fel vid sparande av tilldelningar');
+      }
     } finally {
       setSaving(false);
     }
@@ -205,16 +225,32 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
                           #{point.globalNumber}
                         </span>
                         <ArrowRight size={16} className="text-gray-400" />
-                        <input
-                          type="text"
-                          value={assignments[point.pointId] || ''}
-                          onChange={(e) => handleAssignmentChange(point.pointId, e.target.value)}
-                          placeholder="Avd. #"
-                          className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
-                        />
-                        <span className="text-xs text-gray-500">
-                          {assignments[point.pointId] ? `Avd. ${assignments[point.pointId]}` : 'Ej tilldelad'}
-                        </span>
+                        {point.otherDepartment ? (
+                          <>
+                            <input
+                              type="text"
+                              value={point.otherDepartment.number}
+                              disabled
+                              className="w-20 px-2 py-1 border border-gray-200 rounded text-center bg-gray-100 text-gray-400"
+                            />
+                            <span className="text-xs text-amber-700">
+                              {point.otherDepartment.name} {point.otherDepartment.number}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <input
+                              type="text"
+                              value={assignments[point.pointId] || ''}
+                              onChange={(e) => handleAssignmentChange(point.pointId, e.target.value)}
+                              placeholder="Avd. #"
+                              className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
+                            />
+                            <span className="text-xs text-gray-500">
+                              {assignments[point.pointId] ? `Avd. ${assignments[point.pointId]}` : 'Ej tilldelad'}
+                            </span>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
