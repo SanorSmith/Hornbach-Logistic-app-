@@ -75,8 +75,10 @@ export default function TeamManagement() {
         return;
       }
 
-      // Generate temporary password
-      const tempPassword = Math.random().toString(36).slice(-8);
+      // Generate a cryptographically secure temporary password
+      const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+      const randomBytes = crypto.getRandomValues(new Uint32Array(14));
+      const tempPassword = Array.from(randomBytes, (n) => alphabet[n % alphabet.length]).join('');
 
       // Create user in auth using signup
       const { data: authData, error: authError } = await supabase.auth.signUp({

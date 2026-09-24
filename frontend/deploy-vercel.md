@@ -19,8 +19,8 @@
 In the Vercel project settings, add these environment variables:
 
 ```
-VITE_SUPABASE_URL=https://tgrgqulnmwgcowlrrkfv.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRncmdxdWxubXdnY293bHJya2Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMjkyMzUsImV4cCI6MjA4NzgwNTIzNX0.ZSEz2OD0qyui0vGqd92Wrn8EB1VIMi8FuBDWDIqqLV4
+VITE_SUPABASE_URL=<your Supabase project URL>
+VITE_SUPABASE_ANON_KEY=<your Supabase anon public key>
 ```
 
 ### Step 4: Deploy
