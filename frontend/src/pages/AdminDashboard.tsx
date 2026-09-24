@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, Users, Building2, MapPin, Plus, Edit, Trash2 } from 'lucide-react';
+import { Home, Users, Building2, MapPin, Plus, Edit, Trash2, LayoutGrid, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import AddUserModal from '../components/admin/AddUserModal';
 import AddDepartmentModal from '../components/admin/AddDepartmentModal';
 import AssignPointsModal from '../components/admin/AssignPointsModal';
 import { deleteAppUser } from '../lib/adminUsers';
+import { downloadAllPointsQrSheet } from '../lib/qrPdf';
 
 interface User {
   id: string;
@@ -35,6 +36,19 @@ export default function AdminDashboard() {
   const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<any>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [downloadingQr, setDownloadingQr] = useState(false);
+
+  const handleDownloadAllQr = async () => {
+    setDownloadingQr(true);
+    try {
+      await downloadAllPointsQrSheet();
+    } catch (error) {
+      console.error('Error creating QR PDF:', error);
+      toast.error('Kunde inte skapa PDF');
+    } finally {
+      setDownloadingQr(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -404,7 +418,16 @@ export default function AdminDashboard() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-800">Avdelningar</h2>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button
+                onClick={handleDownloadAllQr}
+                disabled={downloadingQr}
+                title="Alla röda punkters QR-koder, alla avdelningar, på ett A4"
+                className="flex items-center gap-2 px-4 py-2 bg-white text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition disabled:opacity-60"
+              >
+                {downloadingQr ? <Loader2 size={20} className="animate-spin" /> : <LayoutGrid size={20} />}
+                Alla QR-koder
+              </button>
               <button 
                 onClick={() => setShowAssignModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"

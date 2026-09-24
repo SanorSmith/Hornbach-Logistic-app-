@@ -9,7 +9,7 @@ import RedPointCard from '../components/redpoints/RedPointCard';
 import PointActionModal from '../components/redpoints/PointActionModal';
 import QRGenerator from '../components/qr/QRGenerator';
 import { supabase } from '../lib/supabase';
-import { downloadQrSheet } from '../lib/qrPdf';
+import { downloadAllPointsQrSheet, downloadQrSheet } from '../lib/qrPdf';
 import toast from 'react-hot-toast';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { findPointByScan } from '../lib/scanLookup';
@@ -140,26 +140,9 @@ export default function DepartmentDashboard() {
   // One A4 page with the QR codes of every red point in every department,
   // grouped by department.
   const downloadEveryQRCode = async () => {
-    if (points.length === 0) {
-      toast.error('Inga punkter att skriva ut');
-      return;
-    }
-    const departmentName = (id: string | undefined) =>
-      departments.find((d) => d.id === id)?.name.trim() || 'Ej tilldelad';
-
-    const items = points
-      .map((p) => ({
-        code: `RP-${String(p.point_number).padStart(3, '0')}`,
-        title: assignments[p.id]?.trim() || `Punkt ${p.point_number}`,
-        subtitle: departmentName(assignedDepartments[p.id] ?? p.department_id),
-        pointNumber: p.point_number,
-      }))
-      .sort((a, b) => a.subtitle.localeCompare(b.subtitle, 'sv') || a.pointNumber - b.pointNumber)
-      .map(({ code, title, subtitle }) => ({ code, title, subtitle }));
-
     setDownloadingQr('all');
     try {
-      await downloadQrSheet(items, 'QR-koder – alla avdelningar', 'qr-koder-alla-avdelningar.pdf');
+      await downloadAllPointsQrSheet();
     } catch (error) {
       console.error('Error creating QR PDF:', error);
       toast.error('Kunde inte skapa PDF');
