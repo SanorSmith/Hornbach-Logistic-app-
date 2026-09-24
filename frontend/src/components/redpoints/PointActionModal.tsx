@@ -16,6 +16,8 @@ interface PointActionModalProps {
   allowedActions: PointStatus[];
   /** Actions shown but not clickable on this page (e.g. UPPTAGEN on Avdelning). */
   disabledActions?: PointStatus[];
+  /** Allow deleting photos from the gallery (LineFeeder only). */
+  canDeleteImages?: boolean;
 }
 
 export default function PointActionModal({
@@ -24,6 +26,7 @@ export default function PointActionModal({
   onUpdateStatus,
   allowedActions,
   disabledActions = [],
+  canDeleteImages = false,
 }: PointActionModalProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -184,7 +187,7 @@ export default function PointActionModal({
           </div>
 
           <div className="mb-4">
-            <PointImageGallery pointId={point.id} />
+            <PointImageGallery pointId={point.id} canDelete={canDeleteImages} />
           </div>
 
           <input

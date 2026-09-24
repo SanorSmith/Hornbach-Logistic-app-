@@ -81,6 +81,28 @@ export async function uploadPointImage(pointId: string, file: File, note?: strin
   }
 }
 
+/** Deletes one photo (file and row). */
+export async function deletePointImage(imageId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('point_images' as never)
+    .select('storage_path')
+    .eq('id', imageId)
+    .maybeSingle();
+  if (error) throw error;
+
+  const row = data as { storage_path: string } | null;
+  if (!row) return; // already gone
+
+  const { error: storageError } = await supabase.storage.from(BUCKET).remove([row.storage_path]);
+  if (storageError) throw storageError;
+
+  const { error: deleteError } = await supabase
+    .from('point_images' as never)
+    .delete()
+    .eq('id', imageId);
+  if (deleteError) throw deleteError;
+}
+
 /** Newest photos for a point, with short-lived signed URLs for display. */
 export async function getPointImages(pointId: string): Promise<PointImage[]> {
   const rows = (await listRows(pointId)).slice(0, MAX_IMAGES_PER_POINT);
