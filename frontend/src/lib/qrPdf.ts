@@ -7,6 +7,8 @@ export interface QrSheetItem {
   code: string;
   /** Large label under the code, e.g. "KASSA" or "Punkt 3". */
   title: string;
+  /** Optional small text shown before the code, e.g. the department name. */
+  subtitle?: string;
 }
 
 const PAGE_W = 210; // A4 portrait, mm
@@ -90,7 +92,10 @@ export async function downloadQrSheet(items: QrSheetItem[], heading: string, fil
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(Math.max(6, titleSize * 0.45));
     doc.setTextColor(120);
-    doc.text(item.code, x + cellW / 2, titleY + titleSize * 0.35 + 1.5, { align: 'center' });
+    doc.text(item.subtitle ? `${item.subtitle} · ${item.code}` : item.code, x + cellW / 2, titleY + titleSize * 0.35 + 1.5, {
+      align: 'center',
+      maxWidth: cellW - 2,
+    });
     doc.setTextColor(0);
   });
 
