@@ -5,6 +5,7 @@ import { Users, Plus, Edit2, Trash2, Shield, Building2, Mail, Calendar, Search, 
 import { supabase } from '../lib/supabase';
 import { User, UserRole, Department } from '../types';
 import toast from 'react-hot-toast';
+import { createAppUser, deleteAppUser } from '../lib/adminUsers';
 
 export default function TeamManagement() {
   const navigate = useNavigate();
@@ -75,42 +76,14 @@ export default function TeamManagement() {
         return;
       }
 
-      // Generate a cryptographically secure temporary password
-      const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-      const randomBytes = crypto.getRandomValues(new Uint32Array(14));
-      const tempPassword = Array.from(randomBytes, (n) => alphabet[n % alphabet.length]).join('');
-
-      // Create user in auth using signup
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { temporary_password } = await createAppUser({
         email: formData.email,
-        password: tempPassword,
-        options: {
-          data: {
-            full_name: formData.full_name,
-            role: formData.role
-          }
-        }
+        full_name: formData.full_name,
+        role: formData.role,
+        department_id: formData.department_id || null,
       });
 
-      if (authError) throw authError;
-
-      // Create user in database
-      if (authData.user) {
-        const { error: dbError } = await supabase
-          .from('users')
-          .insert({
-            id: authData.user.id,
-            email: formData.email,
-            full_name: formData.full_name,
-            role: formData.role,
-            department_id: formData.department_id || null,
-            is_active: formData.is_active
-          } as any);
-
-        if (dbError) throw dbError;
-      }
-
-      toast.success(`Användare skapad! Temporärt lösenord: ${tempPassword}`);
+      toast.success(`Användare skapad! Temporärt lösenord: ${temporary_password}`, { duration: 15000 });
       setShowCreateModal(false);
       resetForm();
       fetchUsers();
@@ -153,16 +126,14 @@ export default function TeamManagement() {
     try {
       if (!selectedUser) return;
 
-      // Soft delete by setting is_active to false
-      const { error } = await supabase
-        .from('users')
-        .update({ is_active: false } as any)
-        .eq('id', selectedUser.id);
-
-      if (error) throw error;
-
-      // Also delete from auth
-      await supabase.auth.admin.deleteUser(selectedUser.id);
+      const result = await deleteAppUser(selectedUser.id);
+      if (result.deactivated) {
+        toast.success('Användaren har historik och har inaktiverats i stället');
+        setShowDeleteModal(false);
+        setSelectedUser(null);
+        fetchUsers();
+        return;
+      }
 
       toast.success('Användare raderad!');
       setShowDeleteModal(false);
@@ -170,7 +141,7 @@ export default function TeamManagement() {
       fetchUsers();
     } catch (error: any) {
       console.error('Error deleting user:', error);
-      toast.error('Fel vid radering av användare');
+      toast.error(error.message || 'Fel vid radering av användare');
     }
   };
 

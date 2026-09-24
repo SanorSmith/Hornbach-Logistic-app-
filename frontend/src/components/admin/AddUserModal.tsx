@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { createAppUser } from '../../lib/adminUsers';
+import { UserRole } from '../../types';
 import toast from 'react-hot-toast';
 
 interface AddUserModalProps {
@@ -27,21 +28,20 @@ export default function AddUserModal({ isOpen, onClose, onSuccess, departments }
     setLoading(true);
 
     try {
-      // Create user in user_profiles table (no UUID needed)
-      // @ts-ignore - Supabase type inference issue
-      const { error: dbError } = await supabase
-        .from('user_profiles')
-        .insert({
-          email: formData.email,
-          full_name: formData.full_name,
-          role: formData.role,
-          department_id: formData.department_id || null,
-          is_active: true,
-        });
+      const { temporary_password } = await createAppUser({
+        email: formData.email,
+        full_name: formData.full_name,
+        role: formData.role as UserRole,
+        department_id: formData.department_id || null,
+        password: formData.password || undefined,
+      });
 
-      if (dbError) throw dbError;
-
-      toast.success('Användare skapad!');
+      toast.success(
+        temporary_password
+          ? `Användare skapad! Temporärt lösenord: ${temporary_password}`
+          : 'Användare skapad!',
+        { duration: temporary_password ? 15000 : 3000 }
+      );
       setFormData({
         email: '',
         password: '',
@@ -103,16 +103,15 @@ export default function AddUserModal({ isOpen, onClose, onSuccess, departments }
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Lösenord *
+              Lösenord (lämna tomt för att generera)
             </label>
             <input
               type="password"
-              required
-              minLength={6}
+              minLength={8}
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="Minst 6 tecken"
+              placeholder="Minst 8 tecken"
             />
           </div>
 
