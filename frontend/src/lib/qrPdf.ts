@@ -104,3 +104,42 @@ export async function downloadQrSheet(items: QrSheetItem[], heading: string, fil
 
   doc.save(fileName);
 }
+
+/**
+ * One A4 page with the QR codes of every active red point in every department,
+ * grouped by department. Loads the points itself so any page can offer it.
+ */
+export async function downloadAllPointsQrSheet() {
+  const { supabase } = await import('./supabase');
+  const [pointsRes, assignmentsRes, departmentsRes] = await Promise.all([
+    supabase.from('red_points').select('id, point_number, department_id').eq('is_active', true),
+    supabase.from('department_point_assignments' as never).select('point_id, department_id, department_number'),
+    supabase.from('departments').select('id, name'),
+  ]);
+  const error = pointsRes.error ?? assignmentsRes.error ?? departmentsRes.error;
+  if (error) throw error;
+
+  const points = (pointsRes.data ?? []) as { id: string; point_number: number; department_id: string | null }[];
+  const assignments = (assignmentsRes.data ?? []) as { point_id: string; department_id: string; department_number: string }[];
+  const departments = (departmentsRes.data ?? []) as { id: string; name: string }[];
+  if (points.length === 0) throw new Error('Inga punkter att skriva ut');
+
+  const assignmentByPoint = new Map(assignments.map((a) => [a.point_id, a]));
+  const departmentName = new Map(departments.map((d) => [d.id, d.name.trim()]));
+
+  const items = points
+    .map((p) => {
+      const assignment = assignmentByPoint.get(p.id);
+      const departmentId = assignment?.department_id ?? p.department_id ?? '';
+      return {
+        code: `RP-${String(p.point_number).padStart(3, '0')}`,
+        title: assignment?.department_number?.trim() || `Punkt ${p.point_number}`,
+        subtitle: departmentName.get(departmentId) || 'Ej tilldelad',
+        pointNumber: p.point_number,
+      };
+    })
+    .sort((a, b) => a.subtitle.localeCompare(b.subtitle, 'sv') || a.pointNumber - b.pointNumber)
+    .map(({ code, title, subtitle }) => ({ code, title, subtitle }));
+
+  await downloadQrSheet(items, 'QR-koder – alla avdelningar', 'qr-koder-alla-avdelningar.pdf');
+}
