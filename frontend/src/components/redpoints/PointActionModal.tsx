@@ -5,6 +5,7 @@ import { X, Package, Trash2, CheckCircle, Camera, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { uploadPointImage } from '../../lib/pointImages';
 import PointImageGallery from './PointImageGallery';
+import { usePointDetails } from '../../hooks/usePointDetails';
 import { getStatusLabel } from '../../utils/statusColors';
 import StatusCircle from './StatusCircle';
 
@@ -28,6 +29,7 @@ export default function PointActionModal({
   const [isUploading, setIsUploading] = useState(false);
   const [notes, setNotes] = useState('');
   const cameraInput = useRef<HTMLInputElement>(null);
+  const details = usePointDetails(point);
 
   const handleUpdateStatus = async (newStatus: PointStatus) => {
     // Marking as UPPTAGEN requires a photo: open the camera first.
@@ -135,7 +137,7 @@ export default function PointActionModal({
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="text-2xl font-bold text-gray-800 mb-1">
-                Punkt #{point.point_number}
+                Punkt {details.name ?? `#${point.point_number}`}
               </h2>
               <div className="flex items-center gap-2">
                 <StatusCircle status={point.status} />
@@ -156,12 +158,18 @@ export default function PointActionModal({
             <div className="space-y-2 text-sm">
               <div>
                 <span className="text-gray-600">Avdelning:</span>
-                <span className="ml-2 font-semibold">{point.department?.name}</span>
+                <span className="ml-2 font-semibold">{details.departmentName ?? 'Ej tilldelad'}</span>
               </div>
-              {point.department?.location && (
+              {details.name && (
+                <div>
+                  <span className="text-gray-600">Punkt-ID:</span>
+                  <span className="ml-2">#{point.point_number}</span>
+                </div>
+              )}
+              {details.departmentLocation && (
                 <div>
                   <span className="text-gray-600">Plats:</span>
-                  <span className="ml-2">{point.department.location}</span>
+                  <span className="ml-2">{details.departmentLocation}</span>
                 </div>
               )}
               {point.current_user && (
