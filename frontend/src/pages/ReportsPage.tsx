@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
-import { ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Download, FileText, Loader2, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { ROLE_LABELS } from '../lib/access';
+import { useAuth } from '../hooks/useAuth';
+import { downloadReportPdf, printReportPdf, ReportPdfOptions } from '../lib/reportPdf';
 import { UserRole } from '../types';
 import {
   Counts,
@@ -63,6 +65,8 @@ export default function ReportsPage() {
   const [chartMetric, setChartMetric] = useState<MetricKey>('pallets_placed');
   const [tab, setTab] = useState<Tab>('departments');
   const [onlyLineFeeders, setOnlyLineFeeders] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState<'pdf' | 'print' | null>(null);
+  const { user } = useAuth();
 
   const period = useMemo(() => getPeriod(periodType, anchor), [periodType, anchor]);
   const requestKey = `${period.type}|${period.from.toISOString()}|${departmentId}`;
@@ -114,6 +118,49 @@ export default function ReportsPage() {
   }, [report, tab, onlyLineFeeders]);
 
   const departmentName = departments.find((d) => d.id === departmentId)?.name.trim();
+
+  const pdfOptions = (): ReportPdfOptions | null =>
+    report
+      ? {
+          report,
+          period,
+          departmentName: departmentName ?? null,
+          chartMetric,
+          generatedBy: user?.full_name ?? null,
+          roleLabel: (role) => (role ? ROLE_LABELS[role as UserRole] ?? role : ''),
+        }
+      : null;
+
+  const handlePdf = async () => {
+    const opts = pdfOptions();
+    if (!opts) return;
+    setPdfBusy('pdf');
+    try {
+      await downloadReportPdf(opts);
+    } catch (error) {
+      console.error('Error creating report PDF:', error);
+      toast.error('Kunde inte skapa PDF');
+    } finally {
+      setPdfBusy(null);
+    }
+  };
+
+  const handlePrint = async () => {
+    const opts = pdfOptions();
+    if (!opts) return;
+    // Open the tab synchronously so the browser doesn't block it as a popup.
+    const tab = window.open('', '_blank');
+    setPdfBusy('print');
+    try {
+      await printReportPdf(opts, tab);
+    } catch (error) {
+      console.error('Error printing report:', error);
+      tab?.close();
+      toast.error('Kunde inte skriva ut rapporten');
+    } finally {
+      setPdfBusy(null);
+    }
+  };
 
   const exportCsv = () => {
     if (!report) return;
@@ -212,14 +259,32 @@ export default function ReportsPage() {
             ))}
           </select>
 
-          <button
-            onClick={exportCsv}
-            disabled={!report || loading}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-          >
-            <Download size={18} />
-            Exportera (Excel)
-          </button>
+          <div className="grid grid-cols-3 gap-2 lg:flex">
+            <button
+              onClick={handlePrint}
+              disabled={!report || loading || pdfBusy !== null}
+              className="flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+            >
+              {pdfBusy === 'print' ? <Loader2 size={18} className="animate-spin" /> : <Printer size={18} />}
+              Skriv ut
+            </button>
+            <button
+              onClick={handlePdf}
+              disabled={!report || loading || pdfBusy !== null}
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
+            >
+              {pdfBusy === 'pdf' ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
+              PDF
+            </button>
+            <button
+              onClick={exportCsv}
+              disabled={!report || loading}
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+            >
+              <Download size={18} />
+              Excel
+            </button>
+          </div>
         </div>
 
         {loading && !report ? (
