@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, Building2, QrCode, Download, MapPin, Loader2 } from 'lucide-react';
+import { Home, Building2, QrCode, Download, MapPin, Loader2, LayoutGrid } from 'lucide-react';
 import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
 import { RedPoint, PointStatus } from '../types';
@@ -80,7 +80,7 @@ export default function DepartmentDashboard() {
     setShowQRGenerator(true);
   };
 
-  const [downloadingQr, setDownloadingQr] = useState(false);
+  const [downloadingQr, setDownloadingQr] = useState<'department' | 'all' | null>(null);
 
   // One A4 page with the QR codes of every point shown for the selected department.
   const downloadAllQRCodes = async () => {
@@ -104,14 +104,45 @@ export default function DepartmentDashboard() {
       .toLowerCase()
       .replace(/[^a-z0-9åäö]+/g, '-');
 
-    setDownloadingQr(true);
+    setDownloadingQr('department');
     try {
       await downloadQrSheet(items, heading, `qr-koder-${fileSlug}.pdf`);
     } catch (error) {
       console.error('Error creating QR PDF:', error);
       toast.error('Kunde inte skapa PDF');
     } finally {
-      setDownloadingQr(false);
+      setDownloadingQr(null);
+    }
+  };
+
+  // One A4 page with the QR codes of every red point in every department,
+  // grouped by department.
+  const downloadEveryQRCode = async () => {
+    if (points.length === 0) {
+      toast.error('Inga punkter att skriva ut');
+      return;
+    }
+    const departmentName = (id: string | undefined) =>
+      departments.find((d) => d.id === id)?.name.trim() || 'Ej tilldelad';
+
+    const items = points
+      .map((p) => ({
+        code: `RP-${String(p.point_number).padStart(3, '0')}`,
+        title: assignments[p.id]?.trim() || `Punkt ${p.point_number}`,
+        subtitle: departmentName(assignedDepartments[p.id] ?? p.department_id),
+        pointNumber: p.point_number,
+      }))
+      .sort((a, b) => a.subtitle.localeCompare(b.subtitle, 'sv') || a.pointNumber - b.pointNumber)
+      .map(({ code, title, subtitle }) => ({ code, title, subtitle }));
+
+    setDownloadingQr('all');
+    try {
+      await downloadQrSheet(items, 'QR-koder – alla avdelningar', 'qr-koder-alla-avdelningar.pdf');
+    } catch (error) {
+      console.error('Error creating QR PDF:', error);
+      toast.error('Kunde inte skapa PDF');
+    } finally {
+      setDownloadingQr(null);
     }
   };
 
@@ -138,11 +169,22 @@ export default function DepartmentDashboard() {
             <div className="flex items-center gap-3">
               <button
                 onClick={downloadAllQRCodes}
-                disabled={downloadingQr}
+                disabled={downloadingQr !== null}
+                title="QR-koder för vald avdelning på ett A4"
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-60"
               >
-                {downloadingQr ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
+                {downloadingQr === 'department' ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
                 <span className="hidden sm:inline">Ladda ner QR-koder</span>
+              </button>
+
+              <button
+                onClick={downloadEveryQRCode}
+                disabled={downloadingQr !== null}
+                title="Alla röda punkters QR-koder, alla avdelningar, på ett A4"
+                className="flex items-center gap-2 px-4 py-2 bg-white text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition disabled:opacity-60"
+              >
+                {downloadingQr === 'all' ? <Loader2 size={20} className="animate-spin" /> : <LayoutGrid size={20} />}
+                <span className="hidden sm:inline">Alla QR-koder</span>
               </button>
               
               <button
