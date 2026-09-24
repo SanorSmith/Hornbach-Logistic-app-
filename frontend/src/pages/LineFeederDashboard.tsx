@@ -245,6 +245,7 @@ export default function LineFeederDashboard() {
           onClose={() => setSelectedPoint(null)}
           onUpdateStatus={handleUpdateStatus}
           allowedActions={getAllowedActions(selectedPoint)}
+          canDeleteImages
         />
       )}
 

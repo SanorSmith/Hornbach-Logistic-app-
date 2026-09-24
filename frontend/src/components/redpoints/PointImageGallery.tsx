@@ -1,19 +1,38 @@
 import { useEffect, useState } from 'react';
-import { ImageOff } from 'lucide-react';
+import { ImageOff, Trash2, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
-import { getPointImages, MAX_IMAGES_PER_POINT, PointImage } from '../../lib/pointImages';
+import { deletePointImage, getPointImages, MAX_IMAGES_PER_POINT, PointImage } from '../../lib/pointImages';
 
 interface PointImageGalleryProps {
   pointId: string;
   /** Larger thumbnails and notes, used for the read-only Monitor view. */
   large?: boolean;
+  /** Show a delete button on each photo (LineFeeder only). */
+  canDelete?: boolean;
 }
 
 /** The latest photos (and their notes) taken for a point. */
-export default function PointImageGallery({ pointId, large = false }: PointImageGalleryProps) {
+export default function PointImageGallery({ pointId, large = false, canDelete = false }: PointImageGalleryProps) {
   const [images, setImages] = useState<PointImage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (image: PointImage) => {
+    if (!confirm('Vill du radera den här bilden?')) return;
+    setDeletingId(image.id);
+    try {
+      await deletePointImage(image.id);
+      setImages((current) => current.filter((i) => i.id !== image.id));
+      toast.success('Bilden raderades');
+    } catch (error) {
+      console.error('Error deleting point image:', error);
+      toast.error('Kunde inte radera bilden');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -51,7 +70,19 @@ export default function PointImageGallery({ pointId, large = false }: PointImage
       ) : (
         <div className={grid}>
           {images.map((image) => (
-            <div key={image.id} className="flex flex-col gap-1">
+            <div key={image.id} className="relative flex flex-col gap-1">
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(image)}
+                  disabled={deletingId !== null}
+                  className="absolute top-1 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-red-600 shadow hover:bg-red-600 hover:text-white transition disabled:opacity-50"
+                  aria-label="Radera bild"
+                  title="Radera bild"
+                >
+                  {deletingId === image.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                </button>
+              )}
               <a
                 href={image.url}
                 target="_blank"
