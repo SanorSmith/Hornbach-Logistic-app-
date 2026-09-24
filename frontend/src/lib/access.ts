@@ -9,6 +9,7 @@ export const ROUTE_ROLES = {
   team: ['ADMIN', 'TEAM_LEADER'],
   monitor: ['ADMIN', 'TEAM_LEADER', 'LINEFEEDER', 'MONITOR', 'DEPARTMENT'],
   department: ['ADMIN', 'TEAM_LEADER', 'DEPARTMENT'],
+  reports: ['ADMIN', 'TEAM_LEADER'],
 } satisfies Record<string, UserRole[]>;
 
 export const ROLE_LABELS: Record<UserRole, string> = {

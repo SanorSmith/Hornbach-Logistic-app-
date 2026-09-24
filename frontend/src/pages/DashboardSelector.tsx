@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Users, Truck, Monitor, Building2, LogOut } from 'lucide-react';
+import { Users, Truck, Monitor, Building2, LogOut, BarChart3 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { ROUTE_ROLES, ROLE_LABELS } from '../lib/access';
 import { UserRole } from '../types';
@@ -48,6 +48,14 @@ export default function DashboardSelector() {
       path: '/department',
       roles: ROUTE_ROLES.department as UserRole[],
       color: 'bg-indigo-500 hover:bg-indigo-600',
+    },
+    {
+      title: 'Rapporter',
+      description: 'Vecko-, månads- och årsrapporter',
+      icon: BarChart3,
+      path: '/reports',
+      roles: ROUTE_ROLES.reports as UserRole[],
+      color: 'bg-green-600 hover:bg-green-700',
     },
   ].filter((dashboard) => user && dashboard.roles.includes(user.role));
 

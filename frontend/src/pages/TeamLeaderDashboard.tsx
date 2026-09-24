@@ -68,54 +68,8 @@ export default function TeamLeaderDashboard() {
     };
   }, []);
 
-  const handleExportReport = async () => {
-    try {
-      // Fetch all red points with department assignments
-      // @ts-ignore - Supabase type inference issue
-      const { data: points } = await supabase
-        .from('red_points')
-        .select(`
-          id,
-          point_number,
-          status,
-          last_updated,
-          department_id,
-          departments(name)
-        `);
-
-      // @ts-ignore - Supabase type inference issue
-      const { data: assignments } = await supabase
-        .from('department_point_assignments')
-        .select('point_id, department_number');
-
-      // Create CSV content
-      let csvContent = "Punktnummer,Status,Avdelning,Tilldelning,Senast Uppdaterad\n";
-      
-      points?.forEach(point => {
-        const assignment = assignments?.find(a => a.point_id === point.id);
-        const deptNumber = assignment ? assignment.department_number : `#${point.point_number}`;
-        const deptName = point.departments?.name || 'Ej tilldelad';
-        const lastUpdated = new Date(point.last_updated).toLocaleString('sv-SE');
-        
-        csvContent += `${deptNumber},${point.status},${deptName},${assignment?.department_number || 'Ej tilldelad'},${lastUpdated}\n`;
-      });
-
-      // Create and download CSV file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `rapport_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      console.log('Report exported successfully');
-    } catch (error) {
-      console.error('Error exporting report:', error);
-      alert('Fel vid export av rapport');
-    }
+  const handleExportReport = () => {
+    navigate('/reports');
   };
 
   const handleManageTeam = () => {
@@ -390,8 +344,8 @@ export default function TeamLeaderDashboard() {
             >
               <TrendingUp className="text-green-600" size={24} />
               <div className="text-left">
-                <h3 className="font-semibold text-green-900">Exportera Rapport</h3>
-                <p className="text-xs text-green-600">Ladda ner statistik</p>
+                <h3 className="font-semibold text-green-900">Rapporter</h3>
+                <p className="text-xs text-green-600">Vecka, månad, år – exportera statistik</p>
               </div>
             </button>
 
