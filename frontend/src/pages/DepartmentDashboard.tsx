@@ -70,8 +70,8 @@ export default function DepartmentDashboard() {
   };
 
   const handleUpdateStatus = async (status: PointStatus, notes?: string) => {
-    if (!selectedPoint) return;
-    await updatePointStatus(selectedPoint.id, status, notes);
+    if (!selectedPoint) return false;
+    return (await updatePointStatus(selectedPoint.id, status, notes)) === true;
   };
 
   const handleGenerateQR = (pointNumber: number, pointId: string) => {

@@ -51,8 +51,12 @@ async function listRows(pointId: string): Promise<PointImageRow[]> {
   return (data ?? []) as unknown as PointImageRow[];
 }
 
-/** Uploads a photo (with optional note) for a point and removes everything beyond the newest 3. */
-export async function uploadPointImage(pointId: string, file: File, note?: string): Promise<void> {
+/**
+ * Uploads a photo (with optional note) for a point and returns its id.
+ * Call pruneOldImages() once the status change it belongs to has succeeded,
+ * or deletePointImage() to undo it if the change was refused.
+ */
+export async function uploadPointImage(pointId: string, file: File, note?: string): Promise<string> {
   const blob = await compressImage(file);
   const path = `${pointId}/${Date.now()}-${crypto.randomUUID()}.jpg`;
 
@@ -61,24 +65,28 @@ export async function uploadPointImage(pointId: string, file: File, note?: strin
     .upload(path, blob, { contentType: 'image/jpeg' });
   if (uploadError) throw uploadError;
 
-  const { error: insertError } = await supabase
+  const { data, error: insertError } = await supabase
     .from('point_images' as never)
-    .insert({ point_id: pointId, storage_path: path, note: note?.trim() || null } as never);
-  if (insertError) {
+    .insert({ point_id: pointId, storage_path: path, note: note?.trim() || null } as never)
+    .select('id')
+    .single();
+  if (insertError || !data) {
     await supabase.storage.from(BUCKET).remove([path]);
-    throw insertError;
+    throw insertError ?? new Error('Kunde inte spara bilden');
   }
+  return (data as { id: string }).id;
+}
 
-  // Keep only the newest MAX_IMAGES_PER_POINT photos.
+/** Keeps only the newest MAX_IMAGES_PER_POINT photos for a point. */
+export async function pruneOldImages(pointId: string): Promise<void> {
   const rows = await listRows(pointId);
   const extra = rows.slice(MAX_IMAGES_PER_POINT);
-  if (extra.length > 0) {
-    await supabase.storage.from(BUCKET).remove(extra.map((r) => r.storage_path));
-    await supabase
-      .from('point_images' as never)
-      .delete()
-      .in('id', extra.map((r) => r.id));
-  }
+  if (extra.length === 0) return;
+  await supabase.storage.from(BUCKET).remove(extra.map((r) => r.storage_path));
+  await supabase
+    .from('point_images' as never)
+    .delete()
+    .in('id', extra.map((r) => r.id));
 }
 
 /** Deletes one photo (file and row). */

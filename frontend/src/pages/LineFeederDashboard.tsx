@@ -24,8 +24,8 @@ export default function LineFeederDashboard() {
   };
 
   const handleUpdateStatus = async (status: PointStatus, notes?: string) => {
-    if (!selectedPoint) return;
-    await updatePointStatus(selectedPoint.id, status, notes);
+    if (!selectedPoint) return false;
+    return (await updatePointStatus(selectedPoint.id, status, notes)) === true;
   };
 
   // Finds the point for a scanned value (camera or hardware scanner such as a
