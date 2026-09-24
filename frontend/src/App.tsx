@@ -7,8 +7,14 @@ import TeamLeaderDashboard from './pages/TeamLeaderDashboard';
 import MonitorDashboard from './pages/MonitorDashboard';
 import DepartmentDashboard from './pages/DepartmentDashboard';
 import TeamManagement from './pages/TeamManagement';
+import Login from './pages/Login';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import { useAuthListener } from './hooks/useAuth';
+import { ROUTE_ROLES } from './lib/access';
 
 function App() {
+  useAuthListener();
+
   return (
     <BrowserRouter>
       <Toaster
@@ -36,13 +42,14 @@ function App() {
         }}
       />
       <Routes>
-        <Route path="/" element={<DashboardSelector />} />
-        <Route path="/linefeeder" element={<LineFeederDashboard />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/teamleader" element={<TeamLeaderDashboard />} />
-        <Route path="/monitor" element={<MonitorDashboard />} />
-        <Route path="/department" element={<DepartmentDashboard />} />
-        <Route path="/team" element={<TeamManagement />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<ProtectedRoute><DashboardSelector /></ProtectedRoute>} />
+        <Route path="/linefeeder" element={<ProtectedRoute roles={ROUTE_ROLES.linefeeder}><LineFeederDashboard /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute roles={ROUTE_ROLES.admin}><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/teamleader" element={<ProtectedRoute roles={ROUTE_ROLES.teamleader}><TeamLeaderDashboard /></ProtectedRoute>} />
+        <Route path="/monitor" element={<ProtectedRoute roles={ROUTE_ROLES.monitor}><MonitorDashboard /></ProtectedRoute>} />
+        <Route path="/department" element={<ProtectedRoute roles={ROUTE_ROLES.department}><DepartmentDashboard /></ProtectedRoute>} />
+        <Route path="/team" element={<ProtectedRoute roles={ROUTE_ROLES.team}><TeamManagement /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

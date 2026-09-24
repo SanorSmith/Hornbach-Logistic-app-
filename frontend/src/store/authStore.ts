@@ -17,5 +17,5 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
   setUser: (user, supabaseUser) => set({ user, supabaseUser, isLoading: false }),
   setLoading: (loading) => set({ isLoading: loading }),
-  logout: () => set({ user: null, supabaseUser: null }),
+  logout: () => set({ user: null, supabaseUser: null, isLoading: false }),
 }));

@@ -1,8 +1,12 @@
 import { useNavigate } from 'react-router-dom';
-import { Users, Truck, Monitor, Building2 } from 'lucide-react';
+import { Users, Truck, Monitor, Building2, LogOut } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { ROUTE_ROLES, ROLE_LABELS } from '../lib/access';
+import { UserRole } from '../types';
 
 export default function DashboardSelector() {
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
   const dashboards = [
     {
@@ -10,6 +14,7 @@ export default function DashboardSelector() {
       description: 'Hantera röda punkter och materialflöde',
       icon: Truck,
       path: '/linefeeder',
+      roles: ROUTE_ROLES.linefeeder as UserRole[],
       color: 'bg-blue-500 hover:bg-blue-600',
     },
     {
@@ -17,6 +22,7 @@ export default function DashboardSelector() {
       description: 'Systemadministration och användarhantering',
       icon: Users,
       path: '/admin',
+      roles: ROUTE_ROLES.admin as UserRole[],
       color: 'bg-purple-500 hover:bg-purple-600',
     },
     {
@@ -24,6 +30,7 @@ export default function DashboardSelector() {
       description: 'Teamöversikt och rapportering',
       icon: Building2,
       path: '/teamleader',
+      roles: ROUTE_ROLES.teamleader as UserRole[],
       color: 'bg-green-500 hover:bg-green-600',
     },
     {
@@ -31,6 +38,7 @@ export default function DashboardSelector() {
       description: 'Realtidsövervakning av alla punkter',
       icon: Monitor,
       path: '/monitor',
+      roles: ROUTE_ROLES.monitor as UserRole[],
       color: 'bg-orange-500 hover:bg-orange-600',
     },
     {
@@ -38,13 +46,33 @@ export default function DashboardSelector() {
       description: 'Avdelningsspecifik punkthantering och QR-koder',
       icon: Building2,
       path: '/department',
+      roles: ROUTE_ROLES.department as UserRole[],
       color: 'bg-indigo-500 hover:bg-indigo-600',
     },
-  ];
+  ].filter((dashboard) => user && dashboard.roles.includes(user.role));
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-4xl w-full">
+        {user && (
+          <div className="flex items-center justify-end gap-3 mb-6 text-sm text-gray-700">
+            <span>
+              {user.full_name} · {ROLE_LABELS[user.role]}
+            </span>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white rounded-lg shadow hover:bg-gray-50"
+            >
+              <LogOut size={16} />
+              Logga ut
+            </button>
+          </div>
+        )}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Godsmotagning Logistik

@@ -7,9 +7,10 @@ import toast from 'react-hot-toast';
 import AddUserModal from '../components/admin/AddUserModal';
 import AddDepartmentModal from '../components/admin/AddDepartmentModal';
 import AssignPointsModal from '../components/admin/AssignPointsModal';
+import { deleteAppUser } from '../lib/adminUsers';
 
 interface User {
-  id: number;
+  id: string;
   email: string;
   full_name: string;
   role: string;
@@ -44,7 +45,7 @@ export default function AdminDashboard() {
       // Fetch users
       // @ts-ignore - Supabase type inference issue
       const { data: usersData } = await supabase
-        .from('user_profiles')
+        .from('users')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -98,7 +99,8 @@ export default function AdminDashboard() {
 
   const handleEditUser = (user: any) => {
     // TODO: Implement edit user functionality
-    toast.info('Redigera användare - Kommer snart!');
+    toast('Redigera användare via Teamhantering', { icon: 'ℹ️' });
+    navigate('/team');
     console.log('Edit user:', user);
   };
 
@@ -220,31 +222,11 @@ export default function AdminDashboard() {
     }
 
     try {
-      // Delete from user_profiles table (correct table for this app)
-      // @ts-ignore - Supabase type inference issue
-      const { error: dbError } = await supabase
-        .from('user_profiles')
-        .delete()
-        .eq('email', user.email);
-
-      console.log('Delete result:', { dbError, userEmail: user.email });
-      
-      if (dbError) throw dbError;
-
-      // Try to delete from Supabase Auth using email if available
-      try {
-        // First get the user by email
-        const { data: authUsers } = await supabase.auth.admin.listUsers();
-        const authUser = authUsers?.users?.find((u: any) => u.email === user.email);
-        
-        if (authUser?.id) {
-          const { error: authError } = await supabase.auth.admin.deleteUser(authUser.id);
-          if (authError) {
-            console.warn('Auth user deletion failed:', authError);
-          }
-        }
-      } catch (authError) {
-        console.warn('Auth user deletion failed (may not exist in Auth):', authError);
+      const result = await deleteAppUser(user.id);
+      if (result.deactivated) {
+        toast.success('Användaren har historik och har inaktiverats i stället');
+        fetchData();
+        return;
       }
 
       toast.success('Användare raderad');
@@ -253,8 +235,8 @@ export default function AdminDashboard() {
       setTimeout(() => {
         fetchData();
       }, 500);
-    } catch (error) {
-      toast.error('Kunde inte radera användare');
+    } catch (error: any) {
+      toast.error(error?.message || 'Kunde inte radera användare');
       console.error('Delete user error:', error);
     }
   };

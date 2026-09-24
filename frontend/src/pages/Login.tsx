@@ -1,22 +1,23 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth, HOME_ROUTE } from '../hooks/useAuth';
 import { LogIn, Loader2 } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Ogiltig e-postadress'),
-  password: z.string().min(8, 'Lösenord måste vara minst 8 tecken'),
+  password: z.string().min(1, 'Ange lösenord'),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signIn, user } = useAuth();
+  const location = useLocation();
+  const { signIn, user, isLoading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -27,23 +28,22 @@ export default function Login() {
     resolver: zodResolver(loginSchema),
   });
 
+  const requested = (location.state as { from?: string } | null)?.from;
+  const from = requested && requested !== '/login' ? requested : undefined;
+
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
-    const success = await signIn(data.email, data.password);
-    
-    if (success && user) {
-      const routes = {
-        ADMIN: '/admin',
-        TEAM_LEADER: '/team-leader',
-        LINEFEEDER: '/linefeeder',
-        MONITOR: '/monitor',
-        DEPARTMENT: '/department',
-      };
-      navigate(routes[user.role]);
+    const profile = await signIn(data.email, data.password);
+    if (profile) {
+      navigate(from ?? HOME_ROUTE[profile.role], { replace: true });
     }
-    
     setIsLoading(false);
   };
+
+  // Already logged in - skip the form.
+  if (!authLoading && user?.is_active && !isLoading) {
+    return <Navigate to={from ?? HOME_ROUTE[user.role]} replace />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
@@ -64,7 +64,7 @@ export default function Login() {
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             Godsmotagning Logistik
           </h1>
-          <p className="text-gray-600">Linefeedr System</p>
+          <p className="text-gray-600">Logga in för att fortsätta</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

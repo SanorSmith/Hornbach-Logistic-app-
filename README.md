@@ -92,6 +92,24 @@ A complete full-stack logistics management web application for tracking and mana
    npm run preview
    ```
 
+## 🔐 Access Control
+
+- All dashboards require login (`/login`). Each role only sees the dashboards it is allowed to use (see `frontend/src/lib/access.ts`).
+- The database enforces the same rules with Row Level Security:
+  `supabase/migrations/20260924120000_role_based_rls.sql`. Not-logged-in (anon) requests get no data.
+- Users are created and deleted through the `admin-users` edge function
+  (`supabase/functions/admin-users`), which checks that the caller is ADMIN or TEAM_LEADER.
+  The service role key never reaches the browser.
+- Scripts in `supabase/legacy-scripts/` disable security and must not be run.
+
+| Dashboard | ADMIN | TEAM_LEADER | LINEFEEDER | DEPARTMENT | MONITOR |
+|---|---|---|---|---|---|
+| Admin | ✅ | | | | |
+| Team Leader / Team Management | ✅ | ✅ | | | |
+| LineFeeder | ✅ | ✅ | ✅ | | |
+| Avdelning | ✅ | ✅ | | ✅ | |
+| Monitor (read-only) | ✅ | ✅ | ✅ | ✅ | ✅ |
+
 ## 👥 User Roles
 
 ### 1. **ADMIN**
