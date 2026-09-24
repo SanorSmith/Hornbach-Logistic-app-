@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RedPoint, PointStatus } from '../../types';
-import { X, Package, Trash2, CheckCircle, Camera, Loader2, Clock } from 'lucide-react';
+import { X, Package, Trash2, CheckCircle, Camera, Loader2, Clock, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { uploadPointImage } from '../../lib/pointImages';
+import { deletePointImage, pruneOldImages, uploadPointImage } from '../../lib/pointImages';
 import { getLimitedChangeWait, isLimitedChange, RATE_LIMIT_MESSAGE } from '../../lib/rateLimit';
 import PointImageGallery from './PointImageGallery';
 import { usePointDetails } from '../../hooks/usePointDetails';
@@ -13,7 +13,8 @@ import StatusCircle from './StatusCircle';
 interface PointActionModalProps {
   point: RedPoint;
   onClose: () => void;
-  onUpdateStatus: (status: PointStatus, notes?: string) => Promise<void>;
+  /** Resolves true when the status was saved. */
+  onUpdateStatus: (status: PointStatus, notes?: string) => Promise<boolean | void>;
   allowedActions: PointStatus[];
   /** Actions shown but not clickable on this page (e.g. UPPTAGEN on Avdelning). */
   disabledActions?: PointStatus[];
@@ -32,6 +33,7 @@ export default function PointActionModal({
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [notes, setNotes] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const details = usePointDetails(point);
 
@@ -62,7 +64,20 @@ export default function PointActionModal({
   const showRateLimit = (seconds: number) =>
     toast.error(`${RATE_LIMIT_MESSAGE} Försök igen om ${seconds} s.`, { duration: 6000 });
 
+  // After a refused change: keep the dialog open, explain why and show the
+  // countdown if it was the rate limit.
+  const handleFailedChange = async (status: PointStatus) => {
+    const wait = isLimitedChange(point.status, status) ? await getLimitedChangeWait() : 0;
+    if (wait > 0) {
+      startWait(wait);
+      setErrorMessage(`${RATE_LIMIT_MESSAGE} Knappen låses upp när tiden har gått.`);
+    } else {
+      setErrorMessage('Statusen kunde inte sparas. Kontrollera anslutningen och försök igen.');
+    }
+  };
+
   const handleUpdateStatus = async (newStatus: PointStatus) => {
+    setErrorMessage(null);
     if (isRateLimited(newStatus)) {
       showRateLimit(remaining);
       return;
@@ -73,8 +88,12 @@ export default function PointActionModal({
       return;
     }
     setIsUpdating(true);
-    await onUpdateStatus(newStatus, notes || undefined);
+    const saved = await onUpdateStatus(newStatus, notes || undefined);
     setIsUpdating(false);
+    if (saved === false) {
+      await handleFailedChange(newStatus);
+      return;
+    }
     onClose();
   };
 
@@ -83,33 +102,44 @@ export default function PointActionModal({
     event.target.value = ''; // allow taking the same photo again
     if (!file) return; // camera cancelled - status is not changed
 
+    setErrorMessage(null);
     setIsUpdating(true);
 
-    // Re-check the limit before uploading, so no photo is saved for a change
-    // the database would refuse.
+    // Check the limit before uploading, so no photo is saved for a change the
+    // database would refuse.
     const wait = isLimitedChange(point.status, 'UPPTAGEN') ? await getLimitedChangeWait() : 0;
     if (wait > 0) {
       startWait(wait);
-      showRateLimit(wait);
+      setErrorMessage(`${RATE_LIMIT_MESSAGE} Knappen låses upp när tiden har gått.`);
       setIsUpdating(false);
       return;
     }
 
     setIsUploading(true);
+    let imageId: string;
     try {
-      await uploadPointImage(point.id, file, notes);
+      imageId = await uploadPointImage(point.id, file, notes);
     } catch (error) {
       console.error('Error uploading point image:', error);
-      toast.error('Kunde inte spara bilden. Status ändrades inte.');
+      setErrorMessage('Kunde inte spara bilden. Status ändrades inte.');
       setIsUpdating(false);
       setIsUploading(false);
       return;
     }
     setIsUploading(false);
 
-    const savedNote = notes;
+    const saved = await onUpdateStatus('UPPTAGEN', notes || undefined);
+    if (saved === false) {
+      // The status change was refused: remove the photo again so it isn't
+      // left behind without the change it belongs to.
+      await deletePointImage(imageId).catch((error) => console.error('Error removing photo:', error));
+      setIsUpdating(false);
+      await handleFailedChange('UPPTAGEN');
+      return;
+    }
+
+    await pruneOldImages(point.id).catch((error) => console.error('Error pruning old photos:', error));
     setNotes(''); // the note is stored with the photo; start empty next time
-    await onUpdateStatus('UPPTAGEN', savedNote || undefined);
     setIsUpdating(false);
     onClose();
   };
@@ -255,6 +285,13 @@ export default function PointActionModal({
               placeholder="Lägg till noteringar..."
             />
           </div>
+
+          {errorMessage && (
+            <div role="alert" className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              <AlertCircle size={18} className="mt-0.5 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
           <div className="space-y-2">
             {(allowedActions || ['LEDIG', 'UPPTAGEN', 'SKRAP', 'KUNDORDER']).map((status) => getActionButton(status))}
