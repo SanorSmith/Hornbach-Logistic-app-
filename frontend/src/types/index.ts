@@ -158,6 +158,8 @@ export interface User {
   is_active: boolean;
   created_at: string;
   last_login: string | null;
+  /** Set for accounts with a temporary password; the app forces a password change. */
+  must_change_password?: boolean;
   department?: Department;
 }
 

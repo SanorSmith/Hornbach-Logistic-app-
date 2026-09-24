@@ -8,6 +8,7 @@ import MonitorDashboard from './pages/MonitorDashboard';
 import DepartmentDashboard from './pages/DepartmentDashboard';
 import TeamManagement from './pages/TeamManagement';
 import ReportsPage from './pages/ReportsPage';
+import ChangePassword from './pages/ChangePassword';
 import Login from './pages/Login';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { useAuthListener } from './hooks/useAuth';
@@ -46,6 +47,7 @@ function App() {
       <InstallPrompt />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
         <Route path="/" element={<ProtectedRoute><DashboardSelector /></ProtectedRoute>} />
         <Route path="/linefeeder" element={<ProtectedRoute roles={ROUTE_ROLES.linefeeder}><LineFeederDashboard /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute roles={ROUTE_ROLES.admin}><AdminDashboard /></ProtectedRoute>} />

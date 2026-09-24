@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Users, Truck, Monitor, Building2, LogOut, BarChart3 } from 'lucide-react';
+import { Users, Truck, Monitor, Building2, LogOut, BarChart3, KeyRound } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { ROUTE_ROLES, ROLE_LABELS } from '../lib/access';
 import { UserRole } from '../types';
@@ -72,6 +72,13 @@ export default function DashboardSelector() {
             <span>
               {user.full_name} · {ROLE_LABELS[user.role]}
             </span>
+            <button
+              onClick={() => navigate('/change-password')}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white rounded-lg shadow hover:bg-gray-50"
+            >
+              <KeyRound size={16} />
+              Byt lösenord
+            </button>
             <button
               onClick={handleSignOut}
               className="flex items-center gap-1 px-3 py-1.5 bg-white rounded-lg shadow hover:bg-gray-50"

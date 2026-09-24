@@ -83,7 +83,7 @@ export default function TeamManagement() {
         department_id: formData.department_id || null,
       });
 
-      toast.success(`Användare skapad! Temporärt lösenord: ${temporary_password}`, { duration: 15000 });
+      toast.success(`Användare skapad! Temporärt lösenord: ${temporary_password} – användaren måste byta det vid första inloggningen.`, { duration: 15000 });
       setShowCreateModal(false);
       resetForm();
       fetchUsers();

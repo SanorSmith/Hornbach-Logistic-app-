@@ -104,6 +104,8 @@ Deno.serve(async (req) => {
         role,
         department_id: departmentId,
         is_active: true,
+        // The admin chose or generated this password: the user must pick their own.
+        must_change_password: true,
       })
       .select()
       .single();
