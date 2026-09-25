@@ -38,6 +38,28 @@ export function sortPointsForDisplay(points: RedPoint[]): RedPoint[] {
   });
 }
 
+// Natural order for point names: T1, T2, ... T10 (not T1, T10, T2).
+const nameCollator = new Intl.Collator('sv', { numeric: true, sensitivity: 'base' });
+
+export function comparePointNames(a: string, b: string): number {
+  return nameCollator.compare(a.trim(), b.trim());
+}
+
+/**
+ * Points in ascending order of their name in the avdelning (T1, T2 ... T15);
+ * points without a name come last, by point number.
+ */
+export function sortPointsByName(points: RedPoint[], names: Record<string, string>): RedPoint[] {
+  return [...points].sort((a, b) => {
+    const nameA = names[a.id]?.trim();
+    const nameB = names[b.id]?.trim();
+    if (nameA && nameB) return comparePointNames(nameA, nameB) || a.point_number - b.point_number;
+    if (nameA) return -1;
+    if (nameB) return 1;
+    return a.point_number - b.point_number;
+  });
+}
+
 /** Current time, refreshed every minute so durations and 24 h flags stay live. */
 export function useNow(intervalMs = 60_000): number {
   const [now, setNow] = useState(() => Date.now());

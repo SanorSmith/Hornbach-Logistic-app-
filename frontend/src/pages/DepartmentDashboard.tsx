@@ -15,7 +15,7 @@ import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { findPointByScan } from '../lib/scanLookup';
 import ScannerReadyBadge from '../components/redpoints/ScannerReadyBadge';
 import OverdueBadge from '../components/redpoints/OverdueBadge';
-import { formatDuration, isOverdue, sortPointsForDisplay, statusSince, useNow } from '../lib/pointAge';
+import { formatDuration, isOverdue, sortPointsByName, statusSince, useNow } from '../lib/pointAge';
 import { getStatusLabel } from '../utils/statusColors';
 import { useAuth } from '../hooks/useAuth';
 
@@ -59,7 +59,7 @@ export default function DepartmentDashboard() {
   };
 
   const now = useNow();
-  const departmentPoints = sortPointsForDisplay(points).filter((p) => {
+  const departmentPoints = sortPointsByName(points, assignments).filter((p) => {
     // Special case: show all unassigned points
     if (selectedDepartment === 'UNASSIGNED') {
       return !assignments[p.id];
@@ -125,12 +125,10 @@ export default function DepartmentDashboard() {
       selectedDepartment === 'UNASSIGNED'
         ? 'QR-koder – otilldelade punkter'
         : `QR-koder – ${currentDepartment?.name ?? 'Avdelning'}`;
-    const items = [...departmentPoints]
-      .sort((a, b) => a.point_number - b.point_number)
-      .map((p) => ({
-        code: `RP-${String(p.point_number).padStart(3, '0')}`,
-        title: assignments[p.id] || `Punkt ${p.point_number}`,
-      }));
+    const items = departmentPoints.map((p) => ({
+      code: `RP-${String(p.point_number).padStart(3, '0')}`,
+      title: assignments[p.id] || `Punkt ${p.point_number}`,
+    }));
     const fileSlug = (selectedDepartment === 'UNASSIGNED' ? 'otilldelade' : currentDepartment?.name ?? 'avdelning')
       .trim()
       .toLowerCase()
