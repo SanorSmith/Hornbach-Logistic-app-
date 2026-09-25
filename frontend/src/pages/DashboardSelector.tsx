@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Users, Truck, Monitor, Building2, LogOut, BarChart3, KeyRound } from 'lucide-react';
+import { Users, Truck, Monitor, Building2, LogOut, BarChart3, KeyRound, Store } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { ROUTE_ROLES, ROLE_LABELS } from '../lib/access';
+import { ROUTE_ROLES, ROLE_LABELS, facilityLabel } from '../lib/access';
 import { UserRole } from '../types';
 
 export default function DashboardSelector() {
@@ -9,6 +9,14 @@ export default function DashboardSelector() {
   const { user, signOut } = useAuth();
 
   const dashboards = [
+    {
+      title: 'Butiker',
+      description: 'Registrera butiker och deras admin',
+      icon: Store,
+      path: '/superadmin',
+      roles: ROUTE_ROLES.superadmin as UserRole[],
+      color: 'bg-indigo-600 hover:bg-indigo-700',
+    },
     {
       title: 'LineFeeder',
       description: 'Hantera röda punkter och materialflöde',
@@ -92,6 +100,9 @@ export default function DashboardSelector() {
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Godsmotagning Logistik
           </h1>
+          {user?.facility && (
+            <p className="text-lg font-semibold text-red-600 mb-2">HORNBACH {facilityLabel(user.facility)}</p>
+          )}
           <p className="text-xl text-gray-600">
             Välj din dashboard för att komma igång
           </p>

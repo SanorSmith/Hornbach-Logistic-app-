@@ -21,10 +21,12 @@ do $$
 declare
   v_start   timestamptz := date_trunc('day', now() at time zone 'Europe/Stockholm') at time zone 'Europe/Stockholm' - interval '91 days';
   v_end     timestamptz := now() - interval '30 minutes';
-  lf        uuid[] := array(select id from public.users where role = 'LINEFEEDER' and is_active order by created_at);
-  dep       uuid[] := array(select id from public.users where role = 'DEPARTMENT' and is_active order by created_at);
-  tl        uuid   := coalesce((select id from public.users where role = 'TEAM_LEADER' and is_active limit 1),
-                               (select id from public.users where role = 'ADMIN' limit 1));
+  -- Demo data is for store 772 only.
+  fac       uuid   := (select id from public.facilities where code = '772');
+  lf        uuid[] := array(select id from public.users where facility_id = fac and role = 'LINEFEEDER' and is_active order by created_at);
+  dep       uuid[] := array(select id from public.users where facility_id = fac and role = 'DEPARTMENT' and is_active order by created_at);
+  tl        uuid   := coalesce((select id from public.users where facility_id = fac and role = 'TEAM_LEADER' and is_active limit 1),
+                               (select id from public.users where facility_id = fac and role = 'ADMIN' limit 1));
   p         record;
   st        public.point_status;
   nxt       public.point_status;
@@ -53,7 +55,7 @@ begin
     from public.red_points rp
     left join public.department_point_assignments a on a.point_id = rp.id
     left join public.departments d on d.id = coalesce(a.department_id, rp.department_id)
-    where rp.is_active
+    where rp.is_active and rp.facility_id = fac
     order by rp.point_number
   loop
     busy := case when p.dept ilike any (array['Järn%', 'Trädgård%', 'Bygg%']) then 0.65

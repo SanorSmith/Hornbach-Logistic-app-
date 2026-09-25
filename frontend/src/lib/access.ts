@@ -3,6 +3,7 @@ import { UserRole } from '../types';
 // Which roles may open each dashboard. Keep in sync with the RLS policies in
 // supabase/migrations/*_role_based_rls.sql.
 export const ROUTE_ROLES = {
+  superadmin: ['SUPER_ADMIN'],
   linefeeder: ['ADMIN', 'TEAM_LEADER', 'LINEFEEDER'],
   admin: ['ADMIN'],
   teamleader: ['ADMIN', 'TEAM_LEADER'],
@@ -12,7 +13,13 @@ export const ROUTE_ROLES = {
   reports: ['ADMIN', 'TEAM_LEADER'],
 } satisfies Record<string, UserRole[]>;
 
+/** "772 Norsborg" */
+export function facilityLabel(facility: { code: string; name: string } | null | undefined) {
+  return facility ? `${facility.code} ${facility.name}` : '';
+}
+
 export const ROLE_LABELS: Record<UserRole, string> = {
+  SUPER_ADMIN: 'Superadmin',
   ADMIN: 'Admin',
   TEAM_LEADER: 'Teamledare',
   LINEFEEDER: 'LineFeeder',
