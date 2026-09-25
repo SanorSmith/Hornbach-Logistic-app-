@@ -14,6 +14,9 @@ import toast from 'react-hot-toast';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { findPointByScan } from '../lib/scanLookup';
 import ScannerReadyBadge from '../components/redpoints/ScannerReadyBadge';
+import OverdueBadge from '../components/redpoints/OverdueBadge';
+import { formatDuration, isOverdue, sortPointsForDisplay, statusSince, useNow } from '../lib/pointAge';
+import { getStatusLabel } from '../utils/statusColors';
 
 export default function DepartmentDashboard() {
   const navigate = useNavigate();
@@ -49,7 +52,8 @@ export default function DepartmentDashboard() {
     }
   };
 
-  const departmentPoints = points.filter((p) => {
+  const now = useNow();
+  const departmentPoints = sortPointsForDisplay(points).filter((p) => {
     // Special case: show all unassigned points
     if (selectedDepartment === 'UNASSIGNED') {
       return !assignments[p.id];
@@ -283,14 +287,17 @@ export default function DepartmentDashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {departmentPoints.map((point) => (
+              {departmentPoints.map((point) => {
+                const overdue = isOverdue(point, now);
+                return (
                 <div key={point.id} className="relative">
-                  <div 
-                    className="
-                      relative bg-white rounded-lg shadow-sm border-2 p-4 cursor-pointer
+                  {overdue && <OverdueBadge />}
+                  <div
+                    className={`
+                      relative rounded-lg shadow-sm border-2 p-4 cursor-pointer
                       transition-all hover:shadow-md
-                      border-gray-200
-                    "
+                      ${overdue ? 'border-red-600 ring-2 ring-red-600/40 bg-red-50' : 'border-gray-200 bg-white'}
+                    `}
                     onClick={() => handlePointClick(point)}
                   >
                     <div className="flex items-start justify-between mb-3">
@@ -298,12 +305,9 @@ export default function DepartmentDashboard() {
                         <div className={`w-6 h-6 rounded-full bg-${point.status.toLowerCase()}`}></div>
                         <div>
                           <h3 className="text-2xl font-bold text-gray-800">
-                            {assignments[point.id] ? assignments[point.id] : `#${point.point_number}`}
+                            {assignments[point.id]?.trim() || `#${point.point_number}`}
                           </h3>
-                          <p className="text-xs text-gray-500">{point.status}</p>
-                          <p className="text-xs text-gray-400">Point ID: {point.id}</p>
-                          <p className="text-xs text-gray-400">Dept Assignment: {assignments[point.id] || 'NONE'}</p>
-                          <p className="text-xs text-gray-400">Point Dept: {point.department_id}</p>
+                          <p className="text-xs text-gray-500">{getStatusLabel(point.status)}</p>
                         </div>
                       </div>
                     </div>
@@ -311,12 +315,18 @@ export default function DepartmentDashboard() {
                       <MapPin size={16} />
                       <span>{currentDepartment?.name}</span>
                     </div>
-                    <div className="text-xs text-gray-400 mt-3">
-                      Uppdaterad {new Date(point.last_updated).toLocaleString('sv-SE', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </div>
+                    {point.status === 'UPPTAGEN' ? (
+                      <div className={`text-xs mt-3 ${overdue ? 'font-semibold text-red-700' : 'text-gray-500'}`}>
+                        Upptagen i {formatDuration(now - statusSince(point).getTime())}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-400 mt-3">
+                        Uppdaterad {new Date(point.last_updated).toLocaleString('sv-SE', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    )}
                     <div className={`absolute bottom-0 left-0 right-0 h-1 bg-${point.status.toLowerCase()} rounded-b-lg`}></div>
                   </div>
                   <button
@@ -330,7 +340,8 @@ export default function DepartmentDashboard() {
                     <QrCode size={16} className="text-indigo-600" />
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

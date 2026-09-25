@@ -1,6 +1,7 @@
 import { RedPoint } from '../../types';
 import RedPointCard from './RedPointCard';
 import { motion } from 'framer-motion';
+import { sortPointsForDisplay, useNow } from '../../lib/pointAge';
 
 interface RedPointGridProps {
   points: RedPoint[];
@@ -9,10 +10,9 @@ interface RedPointGridProps {
 }
 
 export default function RedPointGrid({ points, onPointClick, assignments }: RedPointGridProps) {
-  const sortedPoints = [...points].sort((a, b) => {
-    const priority = { KUNDORDER: 0, SKRAP: 1, UPPTAGEN: 2, LEDIG: 3 };
-    return priority[a.status] - priority[b.status];
-  });
+  const now = useNow();
+  // Kundorder, Skräp, Upptagen (oldest first), Ledig.
+  const sortedPoints = sortPointsForDisplay(points);
 
   return (
     <motion.div
@@ -33,6 +33,7 @@ export default function RedPointGrid({ points, onPointClick, assignments }: RedP
           point={point}
           onClick={() => onPointClick(point)}
           assignments={assignments}
+          now={now}
         />
       ))}
     </motion.div>

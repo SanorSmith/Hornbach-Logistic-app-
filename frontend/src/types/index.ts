@@ -183,6 +183,8 @@ export interface RedPoint {
   current_user_id: string | null;
   current_user?: Pick<User, 'id' | 'full_name'>;
   last_updated: string;
+  /** When the point got its current status (only changes when the status changes). */
+  status_changed_at?: string;
   is_active: boolean;
   created_at: string;
 }
