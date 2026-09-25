@@ -126,3 +126,19 @@ export function downloadCsv(fileName: string, header: string[], rows: (string | 
   link.click();
   URL.revokeObjectURL(url);
 }
+
+const naturalOrder = new Intl.Collator('sv', { numeric: true, sensitivity: 'base' });
+
+/**
+ * Red point rows labelled by their department number (e.g. "T3") and sorted
+ * naturally: B1, B2 … J1, J2 … T1, T2 … T15 (not T1, T10, T11 …).
+ */
+export function pointRows(report: ReportData) {
+  return report.by_point
+    .map((p) => ({
+      ...p,
+      name: p.name?.trim() || `Punkt ${p.point_number}`,
+      detail: `#${p.point_number} · ${p.department.trim()}`,
+    }))
+    .sort((a, b) => naturalOrder.compare(a.name, b.name) || a.point_number - b.point_number);
+}

@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
-import { Counts, fillSeries, METRICS, MetricKey, Period, ReportData } from './reports';
+import { Counts, fillSeries, METRICS, MetricKey, Period, pointRows, ReportData } from './reports';
 
 // A4 PDF version of the Rapporter page: totals, trend chart and the three
 // breakdown tables. jspdf / jspdf-autotable are loaded on demand.
@@ -127,11 +127,7 @@ async function buildReportPdf(opts: ReportPdfOptions) {
     },
     {
       title: 'Per röd punkt',
-      rows: report.by_point.map((p) => ({
-        ...p,
-        name: p.name?.trim() || `Punkt ${p.point_number}`,
-        detail: `#${p.point_number} · ${p.department.trim()}`,
-      })),
+      rows: pointRows(report),
       showDetail: true,
     },
   ];
