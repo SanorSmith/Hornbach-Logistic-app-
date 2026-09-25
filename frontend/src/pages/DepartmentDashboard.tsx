@@ -17,9 +17,11 @@ import ScannerReadyBadge from '../components/redpoints/ScannerReadyBadge';
 import OverdueBadge from '../components/redpoints/OverdueBadge';
 import { formatDuration, isOverdue, sortPointsForDisplay, statusSince, useNow } from '../lib/pointAge';
 import { getStatusLabel } from '../utils/statusColors';
+import { useAuth } from '../hooks/useAuth';
 
 export default function DepartmentDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { points, updatePointStatus } = useRedPoints();
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [departments, setDepartments] = useState<{ id: string; name: string; location: string }[]>([]);
@@ -39,12 +41,16 @@ export default function DepartmentDashboard() {
       const { data } = await supabase
         .from('departments')
         .select('id, name, location')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .order('name');
 
       if (data) {
-        setDepartments(data);
-        if (data.length > 0 && !selectedDepartment) {
-          setSelectedDepartment(data[0].id);
+        const list = data as { id: string; name: string; location: string }[];
+        setDepartments(list);
+        // Start on the user's own avdelning; otherwise the first one.
+        const own = list.find((d) => d.id === user?.department_id);
+        if (list.length > 0) {
+          setSelectedDepartment((current) => current || (own ?? list[0]).id);
         }
       }
     } catch (error) {
