@@ -96,3 +96,15 @@ export async function createFacilityAdmin(facilityId: string, admin: NewAdmin) {
     email,
   });
 }
+
+/**
+ * Permanently deletes a facility with all its users, points, history and photos.
+ * `confirmCode` must be the facility's store number (checked server-side too).
+ */
+export function deleteFacility(facilityId: string, confirmCode: string) {
+  return invoke<{ deleted: boolean; users: number; photos: number; auth_cleanup_failed?: number }>({
+    action: 'delete_facility',
+    facility_id: facilityId,
+    confirm_code: confirmCode,
+  });
+}
