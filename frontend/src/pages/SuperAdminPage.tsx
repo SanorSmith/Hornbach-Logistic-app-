@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { fetchFacilityOverview, updateFacility, FacilityOverview, FacilityAdmin } from '../lib/facilities';
-import { createFacility, createFacilityAdmin, deleteAppUser, NewAdmin, NewFacility } from '../lib/adminUsers';
+import { createFacility, createFacilityAdmin, deleteAppUser, deleteFacility, NewAdmin, NewFacility } from '../lib/adminUsers';
 import { facilityLabel } from '../lib/access';
 
 type Credentials = { facility: string; email: string; password?: string; warning?: string };
@@ -386,6 +386,75 @@ function CredentialsModal({ credentials, onClose }: { credentials: Credentials; 
   );
 }
 
+function DeleteFacilityModal({
+  facility,
+  onClose,
+  onDeleted,
+}: {
+  facility: FacilityOverview;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [typed, setTyped] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const matches = typed.trim().toLowerCase() === facility.code.toLowerCase();
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!matches) return;
+    setDeleting(true);
+    try {
+      const result = await deleteFacility(facility.id, typed.trim());
+      toast.success(`${facilityLabel(facility)} raderades (${result.users} användare, ${result.photos} bilder)`);
+      if (result.auth_cleanup_failed) {
+        toast.error(`${result.auth_cleanup_failed} inloggningskonton kunde inte raderas`);
+      }
+      onDeleted();
+    } catch (error) {
+      toast.error((error as Error).message);
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Modal title={`Radera ${facilityLabel(facility)}`} onClose={onClose}>
+      <form onSubmit={submit} className="space-y-4">
+        <div className="flex gap-2 p-3 rounded-lg bg-red-50 text-red-800 text-sm">
+          <AlertTriangle size={18} className="shrink-0" />
+          <div>
+            Allt i butiken raderas permanent och kan inte återställas: {facility.user_count} användare (även deras
+            inloggning), {facility.point_count} punkter, {facility.department_count} avdelningar, all historik,
+            rapporter och bilder.
+            <br />
+            Vill du bara pausa butiken, använd <strong>Stäng butik</strong> i stället.
+          </div>
+        </div>
+        <Field label={`Skriv butiksnumret ${facility.code} för att bekräfta`} required>
+          <input
+            className={inputClass}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoComplete="off"
+            autoFocus
+          />
+        </Field>
+        <div className="flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border hover:bg-gray-50">
+            Avbryt
+          </button>
+          <button
+            type="submit"
+            disabled={!matches || deleting}
+            className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+          >
+            {deleting ? 'Raderar…' : 'Radera butiken permanent'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function AdminRow({ admin, onDelete }: { admin: FacilityAdmin; onDelete: () => void }) {
   return (
     <li className="flex items-center justify-between gap-2 py-2">
@@ -419,6 +488,7 @@ export default function SuperAdminPage() {
   const [showNew, setShowNew] = useState(false);
   const [addAdminFor, setAddAdminFor] = useState<FacilityOverview | null>(null);
   const [editing, setEditing] = useState<FacilityOverview | null>(null);
+  const [deleting, setDeleting] = useState<FacilityOverview | null>(null);
   const [credentials, setCredentials] = useState<Credentials | null>(null);
 
   const load = useCallback(async () => {
@@ -606,6 +676,12 @@ export default function SuperAdminPage() {
                   >
                     <Power size={16} /> {facility.is_active ? 'Stäng butik' : 'Öppna butik'}
                   </button>
+                  <button
+                    onClick={() => setDeleting(facility)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                  >
+                    <Trash2 size={16} /> Radera
+                  </button>
                 </div>
               </article>
             ))}
@@ -623,6 +699,16 @@ export default function SuperAdminPage() {
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
+            load();
+          }}
+        />
+      )}
+      {deleting && (
+        <DeleteFacilityModal
+          facility={deleting}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => {
+            setDeleting(null);
             load();
           }}
         />

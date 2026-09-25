@@ -16,6 +16,8 @@
 //     -> { facility_id, user?, temporary_password?, admin_error? }
 //   POST { action: "create", facility_id, email, full_name, password? }   (role is always ADMIN)
 //   POST { action: "delete", user_id }                                   (ADMIN accounts only)
+//   POST { action: "delete_facility", facility_id, confirm_code }
+//     -> { deleted: true, users: n, photos: n }   (confirm_code must equal the store number)
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -182,6 +184,48 @@ Deno.serve(async (req) => {
       return json({ facility_id: facilityId, admin_error: result.error });
     }
     return json({ facility_id: facilityId, ...result });
+  }
+
+  if (body.action === 'delete_facility') {
+    if (!callerIsSuperAdmin) return json({ error: 'Endast superadmin kan radera butiker' }, 403);
+
+    const facilityId = String(body.facility_id ?? '');
+    const { data: facility } = await admin
+      .from('facilities')
+      .select('id, code')
+      .eq('id', facilityId)
+      .maybeSingle();
+    if (!facility) return json({ error: 'Okänd butik' }, 404);
+    // Guard against deleting the wrong store: the super admin types its number.
+    if (String(body.confirm_code ?? '').trim().toLowerCase() !== facility.code.toLowerCase()) {
+      return json({ error: 'Butiksnumret stämmer inte' }, 400);
+    }
+
+    const { data: plan, error: planError } = await admin.rpc('facility_deletion_plan', { p_facility_id: facilityId });
+    if (planError) return json({ error: planError.message }, 400);
+    const userIds = (plan?.user_ids ?? []) as string[];
+    const objectPaths = (plan?.object_paths ?? []) as string[];
+
+    // Photos first: once the rows are gone we can no longer find the files.
+    for (let i = 0; i < objectPaths.length; i += 100) {
+      const { error } = await admin.storage.from('point-images').remove(objectPaths.slice(i, i + 100));
+      if (error) return json({ error: `Kunde inte radera bilder: ${error.message}` }, 400);
+    }
+
+    // All rows in one transaction.
+    const { error: deleteError } = await admin.rpc('delete_facility_data', { p_facility_id: facilityId });
+    if (deleteError) return json({ error: deleteError.message }, 400);
+
+    // Finally the login accounts (their profiles are already gone).
+    const failed: string[] = [];
+    for (const userId of userIds) {
+      const { error } = await admin.auth.admin.deleteUser(userId);
+      if (error && !/not.*found/i.test(error.message)) failed.push(userId);
+    }
+    if (failed.length > 0) {
+      return json({ deleted: true, users: userIds.length, photos: objectPaths.length, auth_cleanup_failed: failed.length });
+    }
+    return json({ deleted: true, users: userIds.length, photos: objectPaths.length });
   }
 
   if (body.action === 'create') {
