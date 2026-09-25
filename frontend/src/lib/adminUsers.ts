@@ -53,3 +53,46 @@ export function createAppUser(input: {
 export function deleteAppUser(userId: string) {
   return invoke<{ deleted?: boolean; deactivated?: boolean }>({ action: 'delete', user_id: userId });
 }
+
+// --- Super admin: facilities and their admin accounts ---------------------
+
+export interface NewFacility {
+  code: string;
+  name: string;
+  location?: string;
+  address?: string;
+  phone?: string;
+}
+
+export interface NewAdmin {
+  email: string;
+  full_name: string;
+  password?: string;
+}
+
+function checkEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(normalized)) throw new Error(translateError('invalid email'));
+  return normalized;
+}
+
+/** Creates the facility (60 points + departments) and its first admin account. */
+export async function createFacility(facility: NewFacility, admin: NewAdmin) {
+  const email = checkEmail(admin.email);
+  return invoke<{ facility_id: string; user?: User; temporary_password?: string; admin_error?: string }>({
+    action: 'create_facility',
+    facility,
+    admin: { ...admin, email },
+  });
+}
+
+/** Adds another admin account to an existing facility. */
+export async function createFacilityAdmin(facilityId: string, admin: NewAdmin) {
+  const email = checkEmail(admin.email);
+  return invoke<{ user: User; temporary_password?: string }>({
+    action: 'create',
+    facility_id: facilityId,
+    ...admin,
+    email,
+  });
+}

@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'TEAM_LEADER' | 'LINEFEEDER' | 'MONITOR' | 'DEPARTMENT';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'TEAM_LEADER' | 'LINEFEEDER' | 'MONITOR' | 'DEPARTMENT';
 export type PointStatus = 'LEDIG' | 'UPPTAGEN' | 'SKRAP' | 'KUNDORDER';
 export type ActionType = 'PICKUP' | 'COMPLETE' | 'SCAN' | 'STATUS_CHANGE';
 export type NotificationType = 'KUNDORDER' | 'SKRAP' | 'URGENT';
@@ -160,7 +160,23 @@ export interface User {
   last_login: string | null;
   /** Set for accounts with a temporary password; the app forces a password change. */
   must_change_password?: boolean;
+  /** Store the user works in; null only for a SUPER_ADMIN. */
+  facility_id?: string | null;
+  /** Loaded with the profile; null when the store is closed (or for a SUPER_ADMIN). */
+  facility?: Facility | null;
   department?: Department;
+}
+
+/** A store, e.g. HORNBACH 772 Norsborg. All data is isolated per facility. */
+export interface Facility {
+  id: string;
+  code: string;
+  name: string;
+  location: string | null;
+  address: string | null;
+  phone: string | null;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface Department {

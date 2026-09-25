@@ -1,14 +1,21 @@
-// admin-users: create and delete app users.
+// admin-users: create and delete app users, and create facilities.
 //
 // Creating/deleting Supabase Auth accounts needs the service role key, which
 // must never be shipped to the browser. This function runs server-side, checks
-// that the caller is an active ADMIN or TEAM_LEADER, and then performs the
-// privileged operation.
+// the caller's role and facility, and then performs the privileged operation.
 //
-// POST { action: "create", email, full_name, role, department_id?, password? }
-//   -> { user, temporary_password? }
-// POST { action: "delete", user_id }
-//   -> { deleted: true } or { deactivated: true } when the user has history
+// ADMIN / TEAM_LEADER (users of their own facility):
+//   POST { action: "create", email, full_name, role, department_id?, password? }
+//     -> { user, temporary_password? }
+//   POST { action: "delete", user_id }
+//     -> { deleted: true } or { deactivated: true } when the user has history
+//
+// SUPER_ADMIN (facilities and their ADMIN accounts):
+//   POST { action: "create_facility", facility: { code, name, location?, address?, phone? },
+//          admin: { email, full_name, password? } }
+//     -> { facility_id, user?, temporary_password?, admin_error? }
+//   POST { action: "create", facility_id, email, full_name, password? }   (role is always ADMIN)
+//   POST { action: "delete", user_id }                                   (ADMIN accounts only)
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -51,14 +58,25 @@ Deno.serve(async (req) => {
 
   const { data: caller } = await admin
     .from('users')
-    .select('id, role, is_active')
+    .select('id, role, is_active, facility_id')
     .eq('id', authData.user.id)
     .maybeSingle();
 
-  if (!caller || !caller.is_active || !['ADMIN', 'TEAM_LEADER'].includes(caller.role)) {
+  if (!caller || !caller.is_active || !['ADMIN', 'TEAM_LEADER', 'SUPER_ADMIN'].includes(caller.role)) {
     return json({ error: 'Forbidden' }, 403);
   }
+  const callerIsSuperAdmin = caller.role === 'SUPER_ADMIN';
   const callerIsAdmin = caller.role === 'ADMIN';
+
+  if (!callerIsSuperAdmin) {
+    // Facility users only act while their facility is open.
+    const { data: facility } = await admin
+      .from('facilities')
+      .select('is_active')
+      .eq('id', caller.facility_id)
+      .maybeSingle();
+    if (!facility?.is_active) return json({ error: 'Forbidden' }, 403);
+  }
 
   let body: Record<string, unknown>;
   try {
@@ -67,42 +85,36 @@ Deno.serve(async (req) => {
     return json({ error: 'Invalid JSON body' }, 400);
   }
 
-  if (body.action === 'create') {
-    const email = String(body.email ?? '').trim().toLowerCase();
-    const fullName = String(body.full_name ?? '').trim();
-    const role = String(body.role ?? '') as Role;
-    const departmentId = body.department_id ? String(body.department_id) : null;
-    const suppliedPassword = body.password ? String(body.password) : '';
-
-    if (!email || !fullName) return json({ error: 'E-post och namn krävs' }, 400);
-    if (!ROLES.includes(role)) return json({ error: 'Ogiltig roll' }, 400);
-    if (role === 'ADMIN' && !callerIsAdmin) {
-      return json({ error: 'Endast admin kan skapa admin-konton' }, 403);
-    }
-    if (suppliedPassword && suppliedPassword.length < 8) {
-      return json({ error: 'Lösenordet måste vara minst 8 tecken' }, 400);
-    }
-
-    const password = suppliedPassword || generatePassword();
+  // Creates the auth account and profile; rolls the account back on failure.
+  async function createAccount(input: {
+    email: string;
+    fullName: string;
+    role: Role;
+    facilityId: string;
+    departmentId: string | null;
+    suppliedPassword: string;
+  }) {
+    const password = input.suppliedPassword || generatePassword();
 
     const { data: created, error: createError } = await admin.auth.admin.createUser({
-      email,
+      email: input.email,
       password,
       email_confirm: true,
-      user_metadata: { full_name: fullName, role },
+      user_metadata: { full_name: input.fullName, role: input.role },
     });
     if (createError || !created.user) {
-      return json({ error: createError?.message ?? 'Kunde inte skapa konto' }, 400);
+      return { error: createError?.message ?? 'Kunde inte skapa konto' };
     }
 
     const { data: profile, error: profileError } = await admin
       .from('users')
       .insert({
         id: created.user.id,
-        email,
-        full_name: fullName,
-        role,
-        department_id: departmentId,
+        email: input.email,
+        full_name: input.fullName,
+        role: input.role,
+        department_id: input.departmentId,
+        facility_id: input.facilityId,
         is_active: true,
         // The admin chose or generated this password: the user must pick their own.
         must_change_password: true,
@@ -113,13 +125,99 @@ Deno.serve(async (req) => {
     if (profileError) {
       // Roll back the auth account so we don't leave orphans behind.
       await admin.auth.admin.deleteUser(created.user.id);
-      return json({ error: profileError.message }, 400);
+      return { error: profileError.message };
     }
 
-    return json({
+    return {
       user: profile,
-      temporary_password: suppliedPassword ? undefined : password,
+      temporary_password: input.suppliedPassword ? undefined : password,
+    };
+  }
+
+  function readAccountInput(source: Record<string, unknown>) {
+    const email = String(source.email ?? '').trim().toLowerCase();
+    const fullName = String(source.full_name ?? '').trim();
+    const suppliedPassword = source.password ? String(source.password) : '';
+    if (!email || !fullName) return { error: 'E-post och namn krävs' };
+    if (suppliedPassword && suppliedPassword.length < 8) {
+      return { error: 'Lösenordet måste vara minst 8 tecken' };
+    }
+    return { email, fullName, suppliedPassword };
+  }
+
+  if (body.action === 'create_facility') {
+    if (!callerIsSuperAdmin) return json({ error: 'Endast superadmin kan skapa butiker' }, 403);
+
+    const facility = (body.facility ?? {}) as Record<string, unknown>;
+    const account = readAccountInput((body.admin ?? {}) as Record<string, unknown>);
+    if ('error' in account) return json({ error: account.error }, 400);
+
+    const code = String(facility.code ?? '').trim();
+    const name = String(facility.name ?? '').trim();
+    if (!/^[0-9A-Za-z-]{1,12}$/.test(code)) {
+      return json({ error: 'Butiksnummer får bara innehålla siffror, bokstäver och bindestreck' }, 400);
+    }
+    if (!name) return json({ error: 'Butiksnamn krävs' }, 400);
+
+    // Run as the caller so create_facility() can check that they are a super admin.
+    const asCaller = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
     });
+    const { data: facilityId, error: facilityError } = await asCaller.rpc('create_facility', {
+      p_code: code,
+      p_name: name,
+      p_location: facility.location ? String(facility.location) : null,
+      p_address: facility.address ? String(facility.address) : null,
+      p_phone: facility.phone ? String(facility.phone) : null,
+    });
+    if (facilityError || !facilityId) {
+      const message = facilityError?.message ?? 'Kunde inte skapa butiken';
+      return json({ error: message.replace(/^FACILITY_EXISTS:\s*/, '') }, 400);
+    }
+
+    const result = await createAccount({ ...account, role: 'ADMIN', facilityId, departmentId: null });
+    if ('error' in result) {
+      // The facility exists; the admin can be added again from the panel.
+      return json({ facility_id: facilityId, admin_error: result.error });
+    }
+    return json({ facility_id: facilityId, ...result });
+  }
+
+  if (body.action === 'create') {
+    const account = readAccountInput(body);
+    if ('error' in account) return json({ error: account.error }, 400);
+
+    let role = String(body.role ?? '') as Role;
+    let facilityId: string = caller.facility_id;
+    let departmentId = body.department_id ? String(body.department_id) : null;
+
+    if (callerIsSuperAdmin) {
+      // A super admin only creates facility admins.
+      role = 'ADMIN';
+      departmentId = null;
+      facilityId = String(body.facility_id ?? '');
+      const { data: facility } = await admin.from('facilities').select('id').eq('id', facilityId).maybeSingle();
+      if (!facility) return json({ error: 'Okänd butik' }, 400);
+    } else {
+      if (!ROLES.includes(role)) return json({ error: 'Ogiltig roll' }, 400);
+      if (role === 'ADMIN' && !callerIsAdmin) {
+        return json({ error: 'Endast admin kan skapa admin-konton' }, 403);
+      }
+      if (departmentId) {
+        const { data: department } = await admin
+          .from('departments')
+          .select('id')
+          .eq('id', departmentId)
+          .eq('facility_id', facilityId)
+          .maybeSingle();
+        if (!department) return json({ error: 'Okänd avdelning' }, 400);
+      }
+    }
+
+    const result = await createAccount({ ...account, role, facilityId, departmentId });
+    if ('error' in result) return json({ error: result.error }, 400);
+    return json(result);
   }
 
   if (body.action === 'delete') {
@@ -129,23 +227,26 @@ Deno.serve(async (req) => {
 
     const { data: target } = await admin
       .from('users')
-      .select('id, role')
+      .select('id, role, facility_id')
       .eq('id', userId)
       .maybeSingle();
 
-    if (target?.role === 'ADMIN' && !callerIsAdmin) {
+    // Only users you manage: your own facility's, or a facility admin for a super admin.
+    if (!target) return json({ error: 'Användaren hittades inte' }, 404);
+    if (callerIsSuperAdmin ? target.role !== 'ADMIN' : target.facility_id !== caller.facility_id) {
+      return json({ error: 'Forbidden' }, 403);
+    }
+    if (target.role === 'ADMIN' && !callerIsAdmin && !callerIsSuperAdmin) {
       return json({ error: 'Endast admin kan radera admin-konton' }, 403);
     }
 
-    if (target) {
-      const { error: deleteError } = await admin.from('users').delete().eq('id', userId);
-      if (deleteError) {
-        // User is referenced by status history / notifications: keep the row
-        // for the audit trail, deactivate it and block sign-in instead.
-        await admin.from('users').update({ is_active: false }).eq('id', userId);
-        await admin.auth.admin.updateUserById(userId, { ban_duration: '876000h' });
-        return json({ deactivated: true });
-      }
+    const { error: deleteError } = await admin.from('users').delete().eq('id', userId);
+    if (deleteError) {
+      // User is referenced by status history / notifications: keep the row
+      // for the audit trail, deactivate it and block sign-in instead.
+      await admin.from('users').update({ is_active: false }).eq('id', userId);
+      await admin.auth.admin.updateUserById(userId, { ban_duration: '876000h' });
+      return json({ deactivated: true });
     }
 
     const { error: authDeleteError } = await admin.auth.admin.deleteUser(userId);

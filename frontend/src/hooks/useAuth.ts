@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 
 // Where each role lands after logging in.
 export const HOME_ROUTE: Record<UserRole, string> = {
+  SUPER_ADMIN: '/superadmin',
   ADMIN: '/',
   TEAM_LEADER: '/',
   LINEFEEDER: '/linefeeder',
@@ -17,7 +18,7 @@ export const HOME_ROUTE: Record<UserRole, string> = {
 async function loadProfile(authUser: SupabaseUser): Promise<User | null> {
   const { data, error } = await supabase
     .from('users')
-    .select('*')
+    .select('*, facility:facilities(id, code, name, location, address, phone, is_active, created_at)')
     .eq('id', authUser.id)
     .maybeSingle();
 
@@ -78,6 +79,12 @@ export function useAuth() {
     }
     if (!profile.is_active) {
       toast.error('Kontot är inaktiverat. Kontakta administratören.');
+      await supabase.auth.signOut();
+      return null;
+    }
+    // The facility is only readable while it is open.
+    if (profile.role !== 'SUPER_ADMIN' && !profile.facility) {
+      toast.error('Butiken är stängd i systemet. Kontakta administratören.');
       await supabase.auth.signOut();
       return null;
     }
