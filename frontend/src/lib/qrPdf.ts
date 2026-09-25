@@ -2,6 +2,8 @@
 // grid that gives the largest codes that still fit on the page.
 // jspdf and qrcode are loaded on demand so they don't grow the main bundle.
 
+import { comparePointNames } from './pointAge';
+
 export interface QrSheetItem {
   /** Value encoded in the QR code, e.g. "RP-003" (what the scanner expects). */
   code: string;
@@ -138,7 +140,7 @@ export async function downloadAllPointsQrSheet() {
         pointNumber: p.point_number,
       };
     })
-    .sort((a, b) => a.subtitle.localeCompare(b.subtitle, 'sv') || a.pointNumber - b.pointNumber)
+    .sort((a, b) => a.subtitle.localeCompare(b.subtitle, 'sv') || comparePointNames(a.title, b.title) || a.pointNumber - b.pointNumber)
     .map(({ code, title, subtitle }) => ({ code, title, subtitle }));
 
   await downloadQrSheet(items, 'QR-koder – alla avdelningar', 'qr-koder-alla-avdelningar.pdf');
