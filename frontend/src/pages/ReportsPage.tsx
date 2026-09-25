@@ -12,6 +12,7 @@ import { UserRole } from '../types';
 import {
   Counts,
   downloadCsv,
+  pointRows,
   fetchReport,
   fillSeries,
   getPeriod,
@@ -109,12 +110,7 @@ export default function ReportsPage() {
           detail: u.role ? ROLE_LABELS[u.role as UserRole] ?? u.role : undefined,
         }));
     }
-    return report.by_point.map((p) => ({
-      ...p,
-      key: p.id,
-      name: p.name?.trim() || `Punkt ${p.point_number}`,
-      detail: `#${p.point_number} · ${p.department.trim()}`,
-    }));
+    return pointRows(report).map((p) => ({ ...p, key: p.id }));
   }, [report, tab, onlyLineFeeders]);
 
   const departmentName = departments.find((d) => d.id === departmentId)?.name.trim();
