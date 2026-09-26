@@ -236,7 +236,7 @@ export default function LineFeederDashboard() {
           allowedActions={allowedActions}
           canDeleteImages
           // LineFeeders place and pick pallets; the privilege is the avdelning's.
-          palletAccess={{ canPlace: true, canPick: true, canManage: isLeader }}
+          palletAccess={{ canPlace: true, canPick: true, canGrant: isLeader, canChange: true, canRaise: isLeader }}
         />
       )}
 

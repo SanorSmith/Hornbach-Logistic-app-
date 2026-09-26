@@ -77,24 +77,35 @@ export async function uploadPointImage(pointId: string, file: File, note?: strin
   return (data as { id: string }).id;
 }
 
-/** Ids of photos belonging to pallets still on the point (kept by pruning). */
-async function openPalletImageIds(pointId: string): Promise<Set<string>> {
+/**
+ * Photo ids of the point's pallets: those of extra pallets (kept apart from the
+ * point's ordinary photos) and those of pallets still on the point.
+ */
+async function palletImageIds(pointId: string): Promise<{ extra: Set<string>; open: Set<string> }> {
   const { data, error } = await supabase
     .from('point_pallets' as never)
-    .select('image_id')
-    .eq('point_id', pointId)
-    .is('picked_at', null);
+    .select('image_id, is_extra, picked_at')
+    .eq('point_id', pointId);
   if (error) throw error;
-  return new Set(((data ?? []) as { image_id: string | null }[]).flatMap((r) => (r.image_id ? [r.image_id] : [])));
+  const rows = (data ?? []) as { image_id: string | null; is_extra: boolean; picked_at: string | null }[];
+  const ids = (keep: (r: (typeof rows)[number]) => boolean) =>
+    new Set(rows.flatMap((r) => (r.image_id && keep(r) ? [r.image_id] : [])));
+  return { extra: ids((r) => r.is_extra), open: ids((r) => !r.picked_at) };
+}
+
+/** The point's ordinary photos, newest first: extra pallets' photos are listed with each pallet instead. */
+async function ordinaryRows(pointId: string): Promise<{ rows: PointImageRow[]; open: Set<string> }> {
+  const [rows, pallets] = await Promise.all([listRows(pointId), palletImageIds(pointId)]);
+  return { rows: rows.filter((r) => !pallets.extra.has(r.id)), open: pallets.open };
 }
 
 /**
- * Keeps only the newest MAX_IMAGES_PER_POINT photos for a point, plus the
- * photos of pallets that are still on it.
+ * Keeps only the newest MAX_IMAGES_PER_POINT ordinary photos for a point, plus
+ * the photo of a pallet still on it. Extra pallets' photos are kept apart.
  */
 export async function pruneOldImages(pointId: string): Promise<void> {
-  const [rows, keep] = await Promise.all([listRows(pointId), openPalletImageIds(pointId)]);
-  const extra = rows.slice(MAX_IMAGES_PER_POINT).filter((r) => !keep.has(r.id));
+  const { rows, open } = await ordinaryRows(pointId);
+  const extra = rows.slice(MAX_IMAGES_PER_POINT).filter((r) => !open.has(r.id));
   if (extra.length === 0) return;
   await supabase.storage.from(BUCKET).remove(extra.map((r) => r.storage_path));
   await supabase
@@ -145,7 +156,7 @@ export async function getImageUrls(imageIds: string[]): Promise<Record<string, s
 
 /** Newest photos for a point, with short-lived signed URLs for display. */
 export async function getPointImages(pointId: string): Promise<PointImage[]> {
-  const rows = (await listRows(pointId)).slice(0, MAX_IMAGES_PER_POINT);
+  const rows = (await ordinaryRows(pointId)).rows.slice(0, MAX_IMAGES_PER_POINT);
   if (rows.length === 0) return [];
 
   const { data, error } = await supabase.storage

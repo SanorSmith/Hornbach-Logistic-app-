@@ -203,6 +203,9 @@ export async function fakeSupabase(page: Page, account: FakeUser): Promise<FakeS
     }
     if (table === 'departments') return rows(route, DEPARTMENTS);
     if (table === 'facilities') return rows(route, [FACILITY]);
+    // Photos: the upload and its row are accepted; no photos are listed.
+    if (path.startsWith('/storage/v1/object/point-images/') && method === 'POST') return json(route, { Key: path });
+    if (table === 'point_images' && method === 'POST') return rows(route, [{ id: `img-${Date.now()}` }]);
     if (table === 'point_images' || table === 'notifications' || table === 'status_history') return rows(route, []);
     if (table === 'rpc/limited_change_wait_seconds') return json(route, 0);
 
@@ -239,7 +242,20 @@ export async function fakeSupabase(page: Page, account: FakeUser): Promise<FakeS
         return json(route, pallet ? [{ id }] : []);
       }
       if (method === 'POST') {
-        state.palletWrites.push({ table, method, body: request.postDataJSON() as Record<string, unknown> });
+        const body = request.postDataJSON() as Record<string, unknown>;
+        state.palletWrites.push({ table, method, body });
+        const pointId = String(body.point_id);
+        state.pallets.push({
+          id: `pl${state.pallets.length + 1}`,
+          point_id: pointId,
+          is_extra: state.pallets.some((p) => p.point_id === pointId && !p.picked_at),
+          image_id: (body.image_id as string | null) ?? null,
+          note: (body.note as string | null) ?? null,
+          placed_by: 'u1',
+          placed_at: new Date().toISOString(),
+          picked_at: null,
+          placer: { full_name: profile.full_name },
+        });
         return route.fulfill({ status: 201 });
       }
       const pointId = url.searchParams.get('point_id');

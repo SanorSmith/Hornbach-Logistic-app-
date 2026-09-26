@@ -385,12 +385,15 @@ export default function DepartmentDashboard() {
           palletAccess={{
             canPlace: isLeader,
             canPick: true,
-            // An avdelning manages extra pallets on its own points only.
-            canManage:
+            // An avdelning allows extra pallets on its own points only, and
+            // can't lower or end that afterwards (LineFeeder / team leader do).
+            canGrant:
               isLeader ||
               (user?.role === 'DEPARTMENT' &&
                 !!user.department_id &&
                 assignedDepartments[selectedPoint.id] === user.department_id),
+            canChange: isLeader,
+            canRaise: isLeader,
           }}
         />
       )}
