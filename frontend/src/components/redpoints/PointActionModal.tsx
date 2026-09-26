@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { deletePointImage, pruneOldImages, uploadPointImage } from '../../lib/pointImages';
 import { getLimitedChangeWait, isLimitedChange, RATE_LIMIT_MESSAGE } from '../../lib/rateLimit';
 import PointImageGallery from './PointImageGallery';
+import PointPalletsPanel from './PointPalletsPanel';
 import { usePointDetails } from '../../hooks/usePointDetails';
 import { getStatusLabel } from '../../utils/statusColors';
 import StatusCircle from './StatusCircle';
@@ -21,6 +22,8 @@ interface PointActionModalProps {
   disabledActions?: PointStatus[];
   /** Allow deleting photos from the gallery (LineFeeder only). */
   canDeleteImages?: boolean;
+  /** What the user may do with the point's pallets and extra pallet privilege. */
+  palletAccess?: { canPlace?: boolean; canPick?: boolean; canManage?: boolean };
 }
 
 export default function PointActionModal({
@@ -30,6 +33,7 @@ export default function PointActionModal({
   allowedActions,
   disabledActions = [],
   canDeleteImages = false,
+  palletAccess,
 }: PointActionModalProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -265,6 +269,8 @@ export default function PointActionModal({
               )}
             </div>
           </div>
+
+          <PointPalletsPanel point={point} {...palletAccess} />
 
           <div className="mb-4">
             <PointImageGallery pointId={point.id} canDelete={canDeleteImages} />

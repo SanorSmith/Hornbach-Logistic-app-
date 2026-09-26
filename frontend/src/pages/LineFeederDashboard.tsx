@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
 import { useDepartments } from '../hooks/useDepartments';
+import { usePallets } from '../hooks/usePallets';
+import { useAuth } from '../hooks/useAuth';
 import { RedPoint, PointStatus } from '../types';
 import RedPointGrid from '../components/redpoints/RedPointGrid';
 import PointActionModal from '../components/redpoints/PointActionModal';
@@ -20,6 +22,9 @@ export default function LineFeederDashboard() {
   const { points, updatePointStatus } = useRedPoints();
   const { assignments, assignedDepartments } = useDepartmentAssignments();
   const departments = useDepartments();
+  usePallets();
+  const { user } = useAuth();
+  const isLeader = user?.role === 'ADMIN' || user?.role === 'TEAM_LEADER';
   // Keep only the id: the point itself always comes from the live list, so an
   // open dialog shows changes made on other devices.
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
@@ -226,6 +231,8 @@ export default function LineFeederDashboard() {
           onUpdateStatus={handleUpdateStatus}
           allowedActions={allowedActions}
           canDeleteImages
+          // LineFeeders place and pick pallets; the privilege is the avdelning's.
+          palletAccess={{ canPlace: true, canPick: true, canManage: isLeader }}
         />
       )}
 

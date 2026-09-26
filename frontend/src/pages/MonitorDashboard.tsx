@@ -5,6 +5,7 @@ import { Home, Monitor as MonitorIcon, RefreshCw } from 'lucide-react';
 import { useRedPointsStore } from '../store/redPointsStore';
 import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
+import { usePallets } from '../hooks/usePallets';
 import RedPointGrid from '../components/redpoints/RedPointGrid';
 import PointImagesViewer from '../components/redpoints/PointImagesViewer';
 import { PointStatus } from '../types';
@@ -13,6 +14,7 @@ export default function MonitorDashboard() {
   const navigate = useNavigate();
   const { points } = useRedPoints();
   const { assignments } = useDepartmentAssignments();
+  usePallets();
   // When the data last changed, not a ticking clock: re-rendering the whole
   // grid every second wore out low-power screens left on all day.
   const lastSyncedAt = useRedPointsStore((state) => state.lastSyncedAt);

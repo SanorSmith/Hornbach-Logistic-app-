@@ -6,6 +6,7 @@ import { MapPin, User } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { formatDuration, isOverdue, statusSince } from '../../lib/pointAge';
 import OverdueBadge from './OverdueBadge';
+import PalletBadge from './PalletBadge';
 import { clickableProps } from '../../lib/clickable';
 import { sv } from 'date-fns/locale';
 
@@ -62,6 +63,7 @@ export default function RedPointCard({ point, onClick, assignments, now }: RedPo
             </p>
           </div>
         </div>
+        <PalletBadge pointId={point.id} />
       </div>
 
       <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">

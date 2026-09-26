@@ -4,6 +4,7 @@ import { RedPoint } from '../../types';
 import { getStatusLabel } from '../../utils/statusColors';
 import StatusCircle from './StatusCircle';
 import PointImageGallery from './PointImageGallery';
+import PointPalletsPanel from './PointPalletsPanel';
 
 interface PointImagesViewerProps {
   point: RedPoint;
@@ -41,6 +42,7 @@ export default function PointImagesViewer({ point, label, onClose }: PointImages
           </button>
         </div>
 
+        <PointPalletsPanel point={point} />
         <PointImageGallery pointId={point.id} large />
       </div>
     </div>

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Home, TrendingUp, Users, MapPin, Activity, BarChart3 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import ExtraPalletsOverview from '../components/teamleader/ExtraPalletsOverview';
 import { PointStatus } from '../types';
 
 interface Stats {
@@ -315,6 +316,8 @@ export default function TeamLeaderDashboard() {
             </div>
           </div>
         </div>
+
+        <ExtraPalletsOverview />
 
         {/* Quick Actions */}
         <div className="bg-white rounded-lg shadow-md p-6">

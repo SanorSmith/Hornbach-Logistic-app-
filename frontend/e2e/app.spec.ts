@@ -121,3 +121,53 @@ test.describe('Avdelning dashboard', () => {
     await expect(page.getByRole('button', { name: /Markera som Upptagen/ })).toBeDisabled();
   });
 });
+
+test.describe('Extra pallets', () => {
+  test('an avdelning allows extra pallets on its own point, in its own name', async ({ page }) => {
+    const db = await fakeSupabase(page, { role: 'DEPARTMENT', department_id: 'd-bygg' });
+    await logIn(page);
+
+    await cardTitles(page).filter({ hasText: /^IB3$/ }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('combobox', { name: 'Antal pallar' }).selectOption('3');
+    await dialog.getByRole('textbox', { name: 'Anledning' }).fill('Kampanj');
+    await dialog.getByRole('button', { name: 'Tillåt extra pallar' }).click();
+
+    await expect(dialog.getByText(/Extra pallar tillåtna \(max 3\) av Anna Andersson/)).toBeVisible();
+    await expect(page.getByText('0/3 pallar')).toBeVisible(); // on the IB3 card
+    // Who granted it is set by the database, never sent by the app.
+    expect(db.palletWrites).toEqual([
+      { table: 'point_allowances', method: 'POST', body: { point_id: 'p6', max_pallets: 3, note: 'Kampanj' } },
+    ]);
+  });
+
+  test('an avdelning cannot grant extra pallets on another avdelning’s point', async ({ page }) => {
+    await fakeSupabase(page, { role: 'DEPARTMENT', department_id: 'd-bygg' });
+    await logIn(page);
+    await page.getByRole('combobox').selectOption('d-jarn');
+
+    await cardTitles(page).filter({ hasText: /^J1$/ }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Tillåt extra pallar' })).toHaveCount(0);
+  });
+
+  test('a LineFeeder sees every pallet on the point and picks an extra one', async ({ page }) => {
+    const db = await fakeSupabase(page, { role: 'LINEFEEDER', extraPallets: true });
+    await logIn(page);
+    await expect(page.getByText('2/3 pallar')).toBeVisible(); // on the J2 card
+
+    await cardTitles(page).filter({ hasText: /^J2$/ }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText(/Extra pallar tillåtna \(max 3\) av Jonas Järn/)).toBeVisible();
+    await expect(dialog.getByRole('listitem')).toHaveCount(2);
+    await expect(dialog.getByText('Grillkol')).toBeVisible();
+
+    await dialog.getByRole('button', { name: 'Pall 2 plockad' }).click();
+    await expect(dialog.getByRole('listitem')).toHaveCount(1);
+    expect(db.palletWrites).toContainEqual(
+      expect.objectContaining({ table: 'point_pallets', method: 'PATCH', body: expect.objectContaining({ id: 'pl2' }) })
+    );
+    // Room for another extra pallet again.
+    await expect(dialog.getByRole('button', { name: /Lägg till extrapall/ })).toBeVisible();
+  });
+});
