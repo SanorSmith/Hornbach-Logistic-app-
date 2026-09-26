@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Users, Building2, MapPin, Plus, Edit, Trash2, LayoutGrid, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import AddUserModal from '../components/admin/AddUserModal';
 import AddDepartmentModal from '../components/admin/AddDepartmentModal';
@@ -28,6 +29,7 @@ interface Department {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [stats, setStats] = useState({ totalUsers: 0, activeUsers: 0, totalDepartments: 0, totalPoints: 0 });
@@ -364,7 +366,10 @@ export default function AdminDashboard() {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => toggleUserStatus(user.id, user.is_active)}
-                        className={`px-2 py-1 text-xs rounded-full ${
+                        // Your own account can't be deactivated from here (you'd lock yourself out).
+                        disabled={user.id === currentUser?.id}
+                        title={user.id === currentUser?.id ? 'Ditt eget konto' : user.is_active ? 'Inaktivera' : 'Aktivera'}
+                        className={`px-2 py-1 text-xs rounded-full disabled:cursor-default ${
                           user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         }`}
                       >
@@ -377,16 +382,20 @@ export default function AdminDashboard() {
                           onClick={() => handleEditUser(user)}
                           className="p-1 hover:bg-gray-100 rounded"
                           title="Redigera användare"
+                          aria-label={`Redigera ${user.full_name}`}
                         >
                           <Edit size={16} className="text-blue-600" />
                         </button>
-                        <button 
-                          onClick={() => handleDeleteUser(user)}
-                          className="p-1 hover:bg-gray-100 rounded"
-                          title="Radera användare"
-                        >
-                          <Trash2 size={16} className="text-red-600" />
-                        </button>
+                        {user.id !== currentUser?.id && (
+                          <button
+                            onClick={() => handleDeleteUser(user)}
+                            className="p-1 hover:bg-gray-100 rounded"
+                            title="Radera användare"
+                            aria-label={`Radera ${user.full_name}`}
+                          >
+                            <Trash2 size={16} className="text-red-600" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
