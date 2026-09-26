@@ -88,7 +88,10 @@ export default function ReportsPage() {
       .then((data) => !cancelled && setReport(data))
       .catch((error) => {
         console.error('Error loading report:', error);
-        if (!cancelled) toast.error('Kunde inte hämta rapporten');
+        if (cancelled) return;
+        // Never show the previous period's numbers under the new period's label.
+        setReport(null);
+        toast.error('Kunde inte hämta rapporten');
       })
       .finally(() => !cancelled && setLoadedKey(requestKey));
     return () => {
@@ -357,7 +360,11 @@ export default function ReportsPage() {
               <BreakdownTable rows={rows} showDetail={tab !== 'departments'} />
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="rounded-xl border border-gray-200 bg-white py-16 text-center text-gray-600">
+            Rapporten kunde inte hämtas. Kontrollera anslutningen och välj perioden igen.
+          </div>
+        )}
       </div>
     </div>
   );

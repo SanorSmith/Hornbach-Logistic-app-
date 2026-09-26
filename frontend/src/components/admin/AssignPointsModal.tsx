@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Save, Search, Wand2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -35,9 +35,13 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
   const [bulkFrom, setBulkFrom] = useState('');
   const [bulkTo, setBulkTo] = useState('');
 
+  // Switching avdelning quickly: only the answer for the latest choice counts.
+  const latestRequest = useRef(0);
+
   const fetchPoints = useCallback(async () => {
     if (!selectedDepartment) return;
-    
+    const request = ++latestRequest.current;
+
     setLoading(true);
     try {
       const { data: redPoints } = await supabase
@@ -51,6 +55,7 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
         .select('point_id, department_id, department_number');
 
       if (assignmentsError) throw assignmentsError;
+      if (request !== latestRequest.current) return;
 
       const rows = (allAssignments || []) as AssignmentRow[];
       const departmentNames = Object.fromEntries(departments.map((d) => [d.id, d.name]));
@@ -78,10 +83,11 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
       setPoints(departmentPoints);
       setAssignments(assignmentsMap);
     } catch (error) {
+      if (request !== latestRequest.current) return;
       console.error('Error fetching points:', error);
       toast.error('Fel vid hämtning av punkter');
     } finally {
-      setLoading(false);
+      if (request === latestRequest.current) setLoading(false);
     }
   }, [selectedDepartment, departments]);
 

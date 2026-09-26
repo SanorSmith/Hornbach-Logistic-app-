@@ -22,7 +22,9 @@ export const useRedPointsStore = create<RedPointsState>((set) => ({
       ),
     })),
   addPoint: (point) =>
-    set((state) => ({ points: [...state.points, point] })),
+    set((state) => ({
+      points: [...state.points, point].sort((a, b) => a.point_number - b.point_number),
+    })),
   removePoint: (id) =>
     set((state) => ({
       points: state.points.filter((p) => p.id !== id),

@@ -17,12 +17,15 @@ export default function LineFeederDashboard() {
   const navigate = useNavigate();
   const { points, updatePointStatus } = useRedPoints();
   const { assignments } = useDepartmentAssignments();
-  const [selectedPoint, setSelectedPoint] = useState<RedPoint | null>(null);
+  // Keep only the id: the point itself always comes from the live list, so an
+  // open dialog shows changes made on other devices.
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
+  const selectedPoint = points.find((p) => p.id === selectedPointId) ?? null;
   const [showScanner, setShowScanner] = useState(false);
   const [filterStatus, setFilterStatus] = useState<PointStatus | 'ALL'>('ALL');
 
   const handlePointClick = (point: RedPoint) => {
-    setSelectedPoint(point);
+    setSelectedPointId(point.id);
   };
 
   const handleUpdateStatus = async (status: PointStatus) => {
@@ -41,7 +44,7 @@ export default function LineFeederDashboard() {
     toast.success(`Punkt ${assignments[found.id]?.trim() || found.point_number} scannad!`);
     setShowScanner(false);
     // Small delay so the camera scanner is closed before the point dialog opens.
-    setTimeout(() => setSelectedPoint(found), 100);
+    setTimeout(() => setSelectedPointId(found.id), 100);
   };
 
   // Hardware scanners (Zebra TC2x etc.) type the code like a keyboard.
@@ -179,8 +182,9 @@ export default function LineFeederDashboard() {
 
       {selectedPoint && (
         <PointActionModal
+          key={selectedPoint.id}
           point={selectedPoint}
-          onClose={() => setSelectedPoint(null)}
+          onClose={() => setSelectedPointId(null)}
           onUpdateStatus={handleUpdateStatus}
           allowedActions={allowedActions}
           canDeleteImages

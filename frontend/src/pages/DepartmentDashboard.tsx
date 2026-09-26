@@ -25,7 +25,10 @@ export default function DepartmentDashboard() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [departments, setDepartments] = useState<{ id: string; name: string; location: string }[]>([]);
   const { assignments, assignedDepartments } = useDepartmentAssignments();
-  const [selectedPoint, setSelectedPoint] = useState<RedPoint | null>(null);
+  // Keep only the id: the point itself always comes from the live list, so an
+  // open dialog shows changes made on other devices.
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
+  const selectedPoint = points.find((p) => p.id === selectedPointId) ?? null;
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [qrPointNumber, setQrPointNumber] = useState<number | null>(null);
   const [qrPointId, setQrPointId] = useState<string | null>(null);
@@ -77,7 +80,7 @@ export default function DepartmentDashboard() {
   const currentDepartment = departments.find(d => d.id === selectedDepartment);
 
   const handlePointClick = (point: RedPoint) => {
-    setSelectedPoint(point);
+    setSelectedPointId(point.id);
   };
 
   const handleUpdateStatus = async (status: PointStatus) => {
@@ -105,7 +108,7 @@ export default function DepartmentDashboard() {
       setSelectedDepartment(pointDepartment);
     }
     toast.success(`Punkt ${assignments[point.id]?.trim() || point.point_number} scannad!`);
-    setSelectedPoint(point);
+    setSelectedPointId(point.id);
   };
 
   useBarcodeScanner(handleScan, !showQRGenerator);
@@ -352,8 +355,9 @@ export default function DepartmentDashboard() {
       {/* Point Action Modal */}
       {selectedPoint && (
         <PointActionModal
+          key={selectedPoint.id}
           point={selectedPoint}
-          onClose={() => setSelectedPoint(null)}
+          onClose={() => setSelectedPointId(null)}
           onUpdateStatus={handleUpdateStatus}
           allowedActions={['LEDIG', 'UPPTAGEN', 'SKRAP', 'KUNDORDER']}
           disabledActions={['UPPTAGEN']}
