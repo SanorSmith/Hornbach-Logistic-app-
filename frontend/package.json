@@ -13,7 +13,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:csp": "E2E_CSP=1 playwright test --project=desktop"
+    "test:e2e:csp": "playwright test --config=playwright.csp.config.ts --project=desktop"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
