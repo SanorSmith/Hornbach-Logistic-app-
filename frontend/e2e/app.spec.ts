@@ -90,8 +90,14 @@ test.describe('LineFeeder dashboard', () => {
     await fakeSupabase(page, { role: 'LINEFEEDER' });
     await logIn(page);
     await expect(cardTitles(page).first()).toBeVisible();
-    await page.keyboard.type('RP-006', { delay: 5 });
-    await page.keyboard.press('Enter');
+    // A scanner "types" the whole code within milliseconds. Send it as one burst:
+    // key-by-key typing can pause > 60 ms on a busy machine and then (correctly)
+    // counts as a person typing, which made this test flaky.
+    await page.evaluate((code) => {
+      for (const key of [...code, 'Enter']) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      }
+    }, 'RP-006');
     await expect(page.getByRole('button', { name: /Markera som Upptagen/ })).toBeVisible();
     // The opened point shows its avdelning (not the "Bygg" option in the filter).
     await expect(page.getByRole('dialog').getByText('Bygg').first()).toBeVisible();
@@ -148,51 +154,46 @@ test.describe('Avdelning dashboard', () => {
 });
 
 test.describe('Extra pallets', () => {
-  test('an avdelning allows extra pallets on its own point, in its own name', async ({ page }) => {
-    const db = await fakeSupabase(page, { role: 'DEPARTMENT', department_id: 'd-bygg' });
+  test('the avdelning cannot allow extra pallets, not even on its own point', async ({ page }) => {
+    await fakeSupabase(page, { role: 'DEPARTMENT', department_id: 'd-bygg' });
     await logIn(page);
-
     await cardTitles(page).filter({ hasText: /^IB3$/ }).click();
     const dialog = page.getByRole('dialog');
-    // The button opens a form; nothing is saved until it is confirmed.
-    await dialog.getByRole('button', { name: 'Tillåt extra pallar' }).click();
-    await dialog.getByRole('combobox', { name: 'Antal pallar' }).selectOption('3');
-    await dialog.getByRole('textbox', { name: 'Anledning (valfritt)' }).fill('Kampanj');
-    await expect(dialog.getByRole('textbox', { name: 'Godkänt av' })).toHaveCount(0);
-    expect(db.palletWrites).toEqual([]);
-    await dialog.getByRole('button', { name: 'Bekräfta' }).click();
-
-    await expect(dialog.getByText(/Extra pallar tillåtna \(max 3\) av Anna Andersson/)).toBeVisible();
-    await expect(page.getByText('0/3 pallar')).toBeVisible(); // on the IB3 card
-    // Who granted it is set by the database, never sent by the app.
-    expect(db.palletWrites).toEqual([
-      {
-        table: 'point_allowances',
-        method: 'POST',
-        body: { point_id: 'p6', max_pallets: 3, note: 'Kampanj', authorized_by_name: null },
-      },
-    ]);
+    await expect(dialog.getByRole('button', { name: /Plocka Kundorder/ })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Tillåt extra pallar' })).toHaveCount(0);
   });
 
-  test('a LineFeeder registers extra pallets for the avdelning, naming who authorized it', async ({ page }) => {
+  test('a LineFeeder allows extra pallets via the confirmed form, naming who authorized it', async ({ page }) => {
     const db = await fakeSupabase(page, { role: 'LINEFEEDER' });
     await logIn(page);
     await cardTitles(page).filter({ hasText: /^IB3$/ }).click();
     const dialog = page.getByRole('dialog');
 
+    // The button opens a form; nothing is saved until it is confirmed.
     await dialog.getByRole('button', { name: 'Tillåt extra pallar' }).click();
+    await dialog.getByRole('combobox', { name: 'Antal pallar' }).selectOption('3');
+    await dialog.getByRole('textbox', { name: 'Anledning (valfritt)' }).fill('Kampanj');
     await expect(dialog.getByRole('button', { name: 'Bekräfta' })).toBeDisabled();
     await dialog.getByRole('textbox', { name: 'Godkänt av' }).fill('Kalle Bygg');
+    expect(db.palletWrites).toEqual([]);
     await dialog.getByRole('button', { name: 'Bekräfta' }).click();
 
-    await expect(dialog.getByText(/max 2\) av Kalle Bygg \(reg\. Anna Andersson\)/)).toBeVisible();
+    await expect(dialog.getByText(/max 3\) av Kalle Bygg \(reg\. Anna Andersson\)/)).toBeVisible();
+    await expect(page.getByText('0/3 pallar')).toBeVisible(); // on the IB3 card
+    // Who registered it is set by the database, never sent by the app.
     expect(db.palletWrites).toEqual([
       {
         table: 'point_allowances',
         method: 'POST',
-        body: { point_id: 'p6', max_pallets: 2, note: null, authorized_by_name: 'Kalle Bygg' },
+        body: { point_id: 'p6', max_pallets: 3, note: 'Kampanj', authorized_by_name: 'Kalle Bygg' },
       },
     ]);
+
+    // Only the LineFeeder changes the maximum afterwards, up or down.
+    await dialog.getByRole('combobox', { name: 'Max pallar' }).selectOption('5');
+    await dialog.getByRole('button', { name: 'Ändra' }).click();
+    await expect.poll(() => db.palletWrites.length).toBe(2);
+    expect(db.palletWrites[1]).toEqual({ table: 'point_allowances', method: 'PATCH', body: { max_pallets: 5 } });
   });
 
   test('zoom is disabled on tablets and phones', async ({ page }) => {
@@ -262,7 +263,7 @@ test.describe('Extra pallets', () => {
     await logIn(page);
     await cardTitles(page).filter({ hasText: /^J2$/ }).click();
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText(/kan bara minskas eller avslutas av LineFeeder eller teamledare/)).toBeVisible();
+    await expect(dialog.getByText('Tillståndet hanteras av LineFeeder.')).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Avsluta tillstånd' })).toHaveCount(0);
   });
 });
