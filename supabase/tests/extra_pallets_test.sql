@@ -106,9 +106,11 @@ begin
   perform pg_temp.act_as(lf);
   perform pg_temp.expect_error(format('insert into public.point_pallets (point_id) values (%L)', p1), 'PALLET_LIMIT:1');
 
-  -- 3. Who may grant: not another avdelning, not Monitor; a LineFeeder only
+  -- 3. Who may grant (20260926190000_extra_pallets_linefeeder_only.sql): not the
+  --    avdelning, not even on its own point, not Monitor; a LineFeeder only
   --    with the name of whoever authorized it.
   perform pg_temp.act_as(dep);
+  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 3)', p1), 'row-level security');
   perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 3)', p2), 'row-level security');
   perform pg_temp.act_as(mon);
   perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 3)', p1), 'row-level security');
@@ -116,14 +118,17 @@ begin
   perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 3)', p1), 'AUTHORIZED_BY_REQUIRED');
   perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets, authorized_by_name) values (%L, 3, %L)', p1, '   '), 'AUTHORIZED_BY_REQUIRED');
 
-  -- 4. The avdelning grants on its own point, registered under its own name.
+  -- 4. The LineFeeder grants, registered under its own login, naming the approver.
+  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets, authorized_by_name) values (%L, 11, %L)', p1, 'Anna'), 'check constraint');
+  insert into public.point_allowances (point_id, max_pallets, note, authorized_by_name, granted_by)
+    values (p1, 3, 'Kampanj', 'Anna Avdelning', tl) returning id into v_allow;
+  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets, authorized_by_name) values (%L, 2, %L)', p1, 'Anna'), 'point_allowances_one_active_idx');
   perform pg_temp.act_as(dep);
-  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 11)', p1), 'check constraint');
-  insert into public.point_allowances (point_id, max_pallets, note, granted_by) values (p1, 3, 'Kampanj', tl) returning id into v_allow;
-  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 2)', p1), 'point_allowances_one_active_idx');
   perform pg_temp.expect_error(format('insert into public.point_pallets (point_id) values (%L)', p1), 'row-level security');
   perform pg_temp.act_as(null);
-  perform pg_temp.ok((select granted_by from public.point_allowances where id = v_allow) = dep, 'granted_by is the avdelning user');
+  select * into v_grant from public.point_allowances where id = v_allow;
+  perform pg_temp.ok(v_grant.granted_by = lf and v_grant.authorized_by_name = 'Anna Avdelning',
+    'granted_by is the LineFeeder, authorized_by_name the approver');
 
   -- 5. Extra pallets, with the rate limit (2 limited changes per 2 minutes).
   perform pg_temp.act_as(lf);
@@ -139,26 +144,30 @@ begin
     'extra pallets are marked extra and linked to the privilege');
   perform pg_temp.ok(public.open_pallet_count(p1) = 3, 'three pallets on the point');
 
-  -- 6. Once granted, the avdelning can't change or end the privilege
-  --    (20260926150000_extra_pallets_rules.sql): row level security skips it.
+  -- 6. The avdelning can't change or end the privilege: row level security skips it.
   perform pg_temp.act_as(dep);
   update public.point_allowances set max_pallets = 2 where id = v_allow;
   get diagnostics v_n = row_count;
-  perform pg_temp.ok(v_n = 0, 'the avdelning cannot lower its privilege');
+  perform pg_temp.ok(v_n = 0, 'the avdelning cannot lower the privilege');
+  update public.point_allowances set max_pallets = 5 where id = v_allow;
+  get diagnostics v_n = row_count;
+  perform pg_temp.ok(v_n = 0, 'the avdelning cannot raise the privilege');
   update public.point_allowances set ended_at = now() where id = v_allow;
   get diagnostics v_n = row_count;
-  perform pg_temp.ok(v_n = 0, 'the avdelning cannot end its privilege');
+  perform pg_temp.ok(v_n = 0, 'the avdelning cannot end the privilege');
 
-  -- A LineFeeder may only lower or end it, and never below the pallets on the point.
+  -- The LineFeeder may raise or lower it, never below the pallets on the point,
+  -- and can't end it while extra pallets stand there.
   perform pg_temp.act_as(lf);
-  perform pg_temp.expect_error(format('update public.point_allowances set max_pallets = 4 where id = %L', v_allow), 'ONLY_LOWER:3');
+  update public.point_allowances set max_pallets = 5 where id = v_allow;
+  perform pg_temp.ok((select max_pallets from public.point_allowances where id = v_allow) = 5, 'the LineFeeder raised the maximum');
   perform pg_temp.expect_error(format('update public.point_allowances set ended_at = now() where id = %L', v_allow), 'PICK_EXTRA_FIRST:3');
   perform pg_temp.expect_error(format('update public.point_allowances set max_pallets = 2 where id = %L', v_allow), 'ALLOWANCE_TOO_LOW:3');
+  update public.point_allowances set max_pallets = 4 where id = v_allow;
 
-  -- A team leader may raise it; nobody may rewrite who granted it.
+  -- Nobody may rewrite who granted or authorized it.
   perform pg_temp.act_as(tl);
   perform pg_temp.expect_error(format('update public.point_allowances set granted_by = %L where id = %L', tl, v_allow), 'Only the maximum');
-  update public.point_allowances set max_pallets = 4 where id = v_allow;
 
   -- 7. Pallets can only be picked; Monitor can't pick.
   perform pg_temp.act_as(lf);
@@ -234,9 +243,13 @@ begin
   perform pg_temp.ok((v_report #>> '{totals,allowances_granted}')::int = 3, 'allowances_granted = 3');
   perform pg_temp.ok((v_report #>> '{totals,skrap_reported}')::int = 1, 'skrap_reported = 1');
   perform pg_temp.ok(
-    (select (u ->> 'allowances_granted')::int = 1 and (u ->> 'pallets_picked')::int = 1
+    (select (u ->> 'allowances_granted')::int = 0 and (u ->> 'pallets_picked')::int = 1
      from jsonb_array_elements(v_report -> 'by_user') u where u ->> 'id' = dep::text),
-    'the avdelning user is credited with its grant and its pick');
+    'the avdelning user is credited with its pick only');
+  perform pg_temp.ok(
+    (select (u ->> 'allowances_granted')::int = 2
+     from jsonb_array_elements(v_report -> 'by_user') u where u ->> 'id' = lf::text),
+    'the LineFeeder is credited with the two privileges it registered');
   perform pg_temp.act_as(dep);
   perform pg_temp.expect_error($q$select public.get_report(now() - interval '1 day', now(), 'day', null)$q$, 'Not allowed');
 
