@@ -381,7 +381,7 @@ export default function PointActionModal({
             {(allowedActions || ['LEDIG', 'UPPTAGEN', 'SKRAP', 'KUNDORDER']).map((status) => getActionButton(status))}
 
             {palletAccess?.canGrant && !allowance && (
-              <GrantExtraPallets pointId={point.id} needsAuthorizer={palletAccess.grantNeedsAuthorizer} />
+              <GrantExtraPallets pointId={point.id} />
             )}
 
             <button

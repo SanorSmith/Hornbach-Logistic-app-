@@ -28,8 +28,6 @@ export interface PalletAccess {
    * avdelning). Shown in the dialog under the status buttons.
    */
   canGrant?: boolean;
-  /** LineFeeder side: who authorized the privilege must be filled in. */
-  grantNeedsAuthorizer?: boolean;
   /** Lower the maximum or end the privilege (LineFeeder, team leader, admin). */
   canChange?: boolean;
   /** Raise the maximum (LineFeeder, team leader, admin). */

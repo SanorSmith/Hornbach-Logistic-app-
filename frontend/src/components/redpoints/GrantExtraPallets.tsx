@@ -6,17 +6,16 @@ import { grantAllowance, MAX_PALLETS, MIN_PALLETS, palletErrorMessage } from '..
 
 interface GrantExtraPalletsProps {
   pointId: string;
-  /** LineFeeder side: the name of whoever approved it must be filled in. */
-  needsAuthorizer?: boolean;
 }
 
 const PALLET_OPTIONS = Array.from({ length: MAX_PALLETS - MIN_PALLETS + 1 }, (_, i) => MIN_PALLETS + i);
 
 /**
  * "Tillåt extra pallar": a button that opens a small form (how many pallets,
- * who authorized it, why) which is saved only when confirmed.
+ * who authorized it, why) which is saved only when confirmed. Who authorized
+ * it is always required, whoever is signed in (the database enforces it too).
  */
-export default function GrantExtraPallets({ pointId, needsAuthorizer = false }: GrantExtraPalletsProps) {
+export default function GrantExtraPallets({ pointId }: GrantExtraPalletsProps) {
   const [open, setOpen] = useState(false);
   const [maxPallets, setMaxPallets] = useState(MIN_PALLETS);
   const [authorizedBy, setAuthorizedBy] = useState('');
@@ -24,7 +23,7 @@ export default function GrantExtraPallets({ pointId, needsAuthorizer = false }: 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const missingAuthorizer = needsAuthorizer && authorizedBy.trim() === '';
+  const missingAuthorizer = authorizedBy.trim() === '';
 
   const close = () => {
     setOpen(false);
@@ -39,7 +38,7 @@ export default function GrantExtraPallets({ pointId, needsAuthorizer = false }: 
     setSaving(true);
     setError(null);
     try {
-      await grantAllowance(pointId, maxPallets, note, needsAuthorizer ? authorizedBy : undefined);
+      await grantAllowance(pointId, maxPallets, note, authorizedBy);
       await loadPallets();
       toast.success(`Punkten får ha ${maxPallets} pallar`);
       setOpen(false);
@@ -85,21 +84,19 @@ export default function GrantExtraPallets({ pointId, needsAuthorizer = false }: 
         </select>
       </label>
 
-      {needsAuthorizer && (
-        <label className="block text-sm text-gray-700">
-          Godkänt av
-          <input
-            type="text"
-            value={authorizedBy}
-            onChange={(e) => setAuthorizedBy(e.target.value)}
-            maxLength={100}
-            required
-            aria-required="true"
-            placeholder="Namn på den som godkände"
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
-          />
-        </label>
-      )}
+      <label className="block text-sm text-gray-700">
+        Godkänt av
+        <input
+          type="text"
+          value={authorizedBy}
+          onChange={(e) => setAuthorizedBy(e.target.value)}
+          maxLength={100}
+          required
+          aria-required="true"
+          placeholder="Namn på den som godkände"
+          className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
+        />
+      </label>
 
       <label className="block text-sm text-gray-700">
         Anledning (valfritt)

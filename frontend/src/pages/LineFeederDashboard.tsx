@@ -7,7 +7,6 @@ import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
 import { useDepartments } from '../hooks/useDepartments';
 import { usePallets } from '../hooks/usePallets';
 import { useDeviceSetting } from '../hooks/useDeviceSetting';
-import { useAuth } from '../hooks/useAuth';
 import { RedPoint, PointStatus } from '../types';
 import RedPointGrid from '../components/redpoints/RedPointGrid';
 import PointActionModal from '../components/redpoints/PointActionModal';
@@ -26,8 +25,6 @@ export default function LineFeederDashboard() {
   const { assignments, assignedDepartments } = useDepartmentAssignments();
   const departments = useDepartments();
   usePallets();
-  const { user } = useAuth();
-  const isLeader = user?.role === 'ADMIN' || user?.role === 'TEAM_LEADER';
   // Keep only the id: the point itself always comes from the live list, so an
   // open dialog shows changes made on other devices.
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
@@ -248,7 +245,6 @@ export default function LineFeederDashboard() {
             // Only the LineFeeder handles extra pallets: grants them (naming who
             // approved them), raises or lowers the maximum, and ends them.
             canGrant: true,
-            grantNeedsAuthorizer: !isLeader,
             canChange: true,
             canRaise: true,
           }}
