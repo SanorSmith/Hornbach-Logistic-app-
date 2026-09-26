@@ -195,6 +195,7 @@ export default function ReportsPage() {
             </div>
           </div>
           <button
+            aria-label="Tillbaka"
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
           >

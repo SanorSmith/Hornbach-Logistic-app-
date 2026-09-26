@@ -192,6 +192,7 @@ export default function DepartmentDashboard() {
               <ScannerReadyBadge />
 
               <button
+                aria-label="Ladda ner QR-koder"
                 onClick={downloadAllQRCodes}
                 disabled={downloadingQr !== null}
                 title="QR-koder för vald avdelning på ett A4"
@@ -202,6 +203,7 @@ export default function DepartmentDashboard() {
               </button>
 
               <button
+                aria-label="Alla QR-koder"
                 onClick={downloadEveryQRCode}
                 disabled={downloadingQr !== null}
                 title="Alla röda punkters QR-koder, alla avdelningar, på ett A4"
@@ -212,6 +214,7 @@ export default function DepartmentDashboard() {
               </button>
               
               <button
+                aria-label="Hem"
                 onClick={() => navigate('/')}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
               >

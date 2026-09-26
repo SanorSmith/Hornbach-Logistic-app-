@@ -211,6 +211,7 @@ export default function TeamLeaderDashboard() {
               <p className="text-sm text-gray-600">Teamöversikt och rapportering</p>
             </div>
             <button
+              aria-label="Hem"
               onClick={() => navigate('/')}
               className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
             >
