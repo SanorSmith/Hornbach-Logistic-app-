@@ -82,6 +82,9 @@ export interface PointAllowance {
   point_id: string;
   max_pallets: number;
   note: string | null;
+  /** Who approved it, typed in when a LineFeeder registers it for the avdelning. */
+  authorized_by_name: string | null;
+  /** Who registered it in the app (the signed-in user). */
   granted_by: string | null;
   granted_at: string;
   ended_at: string | null;

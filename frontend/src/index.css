@@ -52,6 +52,14 @@
   ::file-selector-button {
     border-color: var(--color-gray-200, currentColor);
   }
+
+  /* No zoom on warehouse tablets (with the viewport tag in index.html):
+     taps are never delayed or turned into a double-tap zoom. */
+  html {
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
 }
 
 body {

@@ -7,9 +7,9 @@ import { RedPoint } from '../../types';
 import { usePalletsStore } from '../../store/palletsStore';
 import { loadPallets } from '../../hooks/usePallets';
 import {
+  allowanceAuthorizer,
   changeAllowance,
   endAllowance,
-  grantAllowance,
   MAX_PALLETS,
   MIN_PALLETS,
   palletErrorMessage,
@@ -23,15 +23,20 @@ export interface PalletAccess {
   canPlace?: boolean;
   /** Mark a pallet as picked. */
   canPick?: boolean;
-  /** Allow extra pallets on the point (its own avdelning, team leader, admin). */
+  /**
+   * "Tillåt extra pallar" (the point's own avdelning, LineFeeder, team leader,
+   * admin). Shown in the dialog under the status buttons.
+   */
   canGrant?: boolean;
+  /** LineFeeder side: who authorized the privilege must be filled in. */
+  grantNeedsAuthorizer?: boolean;
   /** Lower the maximum or end the privilege (LineFeeder, team leader, admin). */
   canChange?: boolean;
   /** Raise the maximum (team leader, admin). */
   canRaise?: boolean;
 }
 
-interface PointPalletsPanelProps extends Omit<PalletAccess, 'canPlace'> {
+interface PointPalletsPanelProps extends Pick<PalletAccess, 'canPick' | 'canChange' | 'canRaise'> {
   point: RedPoint;
 }
 
@@ -41,13 +46,13 @@ const ago = (iso: string) => formatDistanceToNow(new Date(iso), { addSuffix: tru
 
 /**
  * The pallets on a point and its extra pallet privilege ("Extrapallar").
- * Shown only when there is something to show or do: an ordinary point with
- * one pallet stays as before. Pallets are added with "Markera som Upptagen".
+ * Shown only while the point may or does hold more than one pallet. Pallets
+ * are added with "Markera som Upptagen"; the privilege is granted with
+ * "Tillåt extra pallar" (GrantExtraPallets) under the status buttons.
  */
 export default function PointPalletsPanel({
   point,
   canPick = false,
-  canGrant = false,
   canChange = false,
   canRaise = false,
 }: PointPalletsPanelProps) {
@@ -57,8 +62,6 @@ export default function PointPalletsPanel({
 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [grantMax, setGrantMax] = useState(MIN_PALLETS);
-  const [grantNote, setGrantNote] = useState('');
   const [newMax, setNewMax] = useState<number | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
 
@@ -74,8 +77,7 @@ export default function PointPalletsPanel({
     };
   }, [imageKey]);
 
-  const showGrant = canGrant && !allowance;
-  if (!allowance && open.length <= 1 && !showGrant) return null;
+  if (!allowance && open.length <= 1) return null;
 
   const shownMax = newMax ?? allowance?.max_pallets ?? MIN_PALLETS;
   // A LineFeeder may only lower what the avdelning allowed, never below what stands there.
@@ -108,23 +110,15 @@ export default function PointPalletsPanel({
         </span>
       </h3>
 
-      {allowance ? (
+      {allowance && (
         <p className="mt-1 text-xs text-indigo-900">
-          Extra pallar tillåtna (max {allowance.max_pallets}) av {allowance.granter?.full_name ?? 'okänd'},{' '}
+          Extra pallar tillåtna (max {allowance.max_pallets}) av {allowanceAuthorizer(allowance)},{' '}
           {ago(allowance.granted_at)}.
           {allowance.note && <span className="block italic">”{allowance.note}”</span>}
           {!canChange && (
             <span className="block">Tillståndet kan bara minskas eller avslutas av LineFeeder eller teamledare.</span>
           )}
         </p>
-      ) : (
-        showGrant && (
-          <p className="mt-1 text-xs text-indigo-900">
-            Behöver avdelningen ställa fler än en pall här, t.ex. vid en kampanj? Tillåt extra pallar. När
-            tillståndet är givet kan bara LineFeeder eller teamledare minska eller avsluta det; det avslutas av sig
-            självt när det är en pall kvar.
-          </p>
-        )
       )}
 
       {open.length > 0 && (
@@ -208,49 +202,6 @@ export default function PointPalletsPanel({
             className="ml-auto rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 disabled:opacity-50"
           >
             Avsluta tillstånd
-          </button>
-        </div>
-      )}
-
-      {showGrant && (
-        <div className="mt-3 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              Antal pallar
-              <select
-                value={grantMax}
-                onChange={(e) => setGrantMax(Number(e.target.value))}
-                className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-              >
-                {range(MIN_PALLETS, MAX_PALLETS).map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <input
-              type="text"
-              value={grantNote}
-              onChange={(e) => setGrantNote(e.target.value)}
-              maxLength={500}
-              aria-label="Anledning"
-              placeholder="Anledning (valfritt)"
-              className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() =>
-              run('grant', async () => {
-                await grantAllowance(point.id, grantMax, grantNote);
-                setGrantNote('');
-              }, `Punkten får ha ${grantMax} pallar`)
-            }
-            disabled={busy !== null}
-            className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            Tillåt extra pallar
           </button>
         </div>
       )}

@@ -56,7 +56,12 @@ export default function ExtraPalletsOverview() {
                       </span>
                     </td>
                     <td className="py-2 pr-4">
-                      {allowance.granter?.full_name ?? 'Okänd'}
+                      {allowance.authorized_by_name ?? allowance.granter?.full_name ?? 'Okänd'}
+                      {allowance.authorized_by_name && (
+                        <span className="block text-xs text-gray-500">
+                          registrerat av {allowance.granter?.full_name ?? 'okänd'}
+                        </span>
+                      )}
                       <span className="block text-xs text-gray-500">
                         {formatDistanceToNow(new Date(allowance.granted_at), { addSuffix: true, locale: sv })}
                       </span>

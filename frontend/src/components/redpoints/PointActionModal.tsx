@@ -8,6 +8,7 @@ import { deletePointImage, pruneOldImages, uploadPointImage } from '../../lib/po
 import { getLimitedChangeWait, isLimitedChange, RATE_LIMIT_MESSAGE, rateLimitSeconds } from '../../lib/rateLimit';
 import PointImageGallery from './PointImageGallery';
 import PointPalletsPanel, { PalletAccess } from './PointPalletsPanel';
+import GrantExtraPallets from './GrantExtraPallets';
 import { usePalletsStore } from '../../store/palletsStore';
 import { loadPallets } from '../../hooks/usePallets';
 import { palletErrorMessage, palletSummary, placePallet } from '../../lib/pallets';
@@ -335,7 +336,12 @@ export default function PointActionModal({
             </div>
           </div>
 
-          <PointPalletsPanel point={point} {...palletAccess} />
+          <PointPalletsPanel
+            point={point}
+            canPick={palletAccess?.canPick}
+            canChange={palletAccess?.canChange}
+            canRaise={palletAccess?.canRaise}
+          />
 
           <div className="mb-4">
             <PointImageGallery pointId={point.id} canDelete={canDeleteImages} />
@@ -373,7 +379,11 @@ export default function PointActionModal({
 
           <div className="space-y-2">
             {(allowedActions || ['LEDIG', 'UPPTAGEN', 'SKRAP', 'KUNDORDER']).map((status) => getActionButton(status))}
-            
+
+            {palletAccess?.canGrant && !allowance && (
+              <GrantExtraPallets pointId={point.id} needsAuthorizer={palletAccess.grantNeedsAuthorizer} />
+            )}
+
             <button
               onClick={onClose}
               className="w-full py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition"

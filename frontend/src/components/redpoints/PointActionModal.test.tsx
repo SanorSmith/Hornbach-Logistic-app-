@@ -15,9 +15,11 @@ vi.mock('../../lib/pointImages', () => ({
   getImageUrls: vi.fn().mockResolvedValue({}),
 }));
 const placePallet = vi.hoisted(() => vi.fn());
+const grantAllowance = vi.hoisted(() => vi.fn());
 vi.mock('../../lib/pallets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/pallets')>()),
   placePallet,
+  grantAllowance,
 }));
 vi.mock('../../hooks/usePallets', () => ({ loadPallets: vi.fn() }));
 vi.mock('../../hooks/usePointDetails', () => ({
@@ -48,6 +50,7 @@ const allowance: PointAllowance = {
   point_id: 'p1',
   max_pallets: 3,
   note: null,
+  authorized_by_name: null,
   granted_by: 'dep',
   granted_at: new Date().toISOString(),
   ended_at: null,
@@ -56,6 +59,7 @@ const allowance: PointAllowance = {
 beforeEach(() => {
   getLimitedChangeWait.mockReset().mockResolvedValue(0);
   placePallet.mockReset().mockResolvedValue(undefined);
+  grantAllowance.mockReset().mockResolvedValue(undefined);
   usePalletsStore.setState({ pallets: [], allowances: [] });
 });
 
@@ -176,6 +180,60 @@ describe('PointActionModal', () => {
       const photo = new File(['x'], 'p.jpg', { type: 'image/jpeg' });
       await userEvent.upload(document.querySelector('input[type="file"]') as HTMLInputElement, photo);
       expect(await screen.findByRole('alert')).toHaveTextContent('Punkten är full (max 3 pallar).');
+    });
+  });
+
+  describe('Tillåt extra pallar', () => {
+    it('sits under Plocka Kundorder and opens a form that must be confirmed', async () => {
+      render(
+        <PointActionModal point={makePoint({ id: 'p1' })} onClose={() => {}} onUpdateStatus={vi.fn()} allowedActions={[...ALL]} palletAccess={{ canGrant: true }} />
+      );
+      const buttons = screen.getAllByRole('button').map((b) => b.textContent);
+      expect(buttons.indexOf('Tillåt extra pallar')).toBe(buttons.indexOf('Plocka Kundorder') + 1);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Tillåt extra pallar' }));
+      expect(grantAllowance).not.toHaveBeenCalled(); // nothing saved before confirming
+      await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Antal pallar' }), '4');
+      await userEvent.type(screen.getByRole('textbox', { name: 'Anledning (valfritt)' }), 'Kampanj');
+      expect(screen.queryByRole('textbox', { name: 'Godkänt av' })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Bekräfta' }));
+
+      await waitFor(() => expect(grantAllowance).toHaveBeenCalledWith('p1', 4, 'Kampanj', undefined));
+    });
+
+    it('on the LineFeeder side, needs the name of whoever authorized it', async () => {
+      render(
+        <PointActionModal
+          point={makePoint({ id: 'p1' })}
+          onClose={() => {}}
+          onUpdateStatus={vi.fn()}
+          allowedActions={[...ALL]}
+          palletAccess={{ canGrant: true, grantNeedsAuthorizer: true }}
+        />
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Tillåt extra pallar' }));
+      expect(screen.getByRole('button', { name: 'Bekräfta' })).toBeDisabled();
+
+      await userEvent.type(screen.getByRole('textbox', { name: 'Godkänt av' }), 'Anna Avdelning');
+      await userEvent.click(screen.getByRole('button', { name: 'Bekräfta' }));
+      await waitFor(() => expect(grantAllowance).toHaveBeenCalledWith('p1', 2, '', 'Anna Avdelning'));
+    });
+
+    it('can be closed without saving, and is gone while a privilege is active', async () => {
+      const { unmount } = render(
+        <PointActionModal point={makePoint({ id: 'p1' })} onClose={() => {}} onUpdateStatus={vi.fn()} allowedActions={[...ALL]} palletAccess={{ canGrant: true }} />
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Tillåt extra pallar' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Ångra' }));
+      expect(screen.getByRole('button', { name: 'Tillåt extra pallar' })).toBeInTheDocument();
+      expect(grantAllowance).not.toHaveBeenCalled();
+      unmount();
+
+      usePalletsStore.setState({ pallets: [pallet('x')], allowances: [{ ...allowance, point_id: 'p1' }] });
+      render(
+        <PointActionModal point={makePoint({ id: 'p1' })} onClose={() => {}} onUpdateStatus={vi.fn()} allowedActions={[...ALL]} palletAccess={{ canGrant: true }} />
+      );
+      expect(screen.queryByRole('button', { name: 'Tillåt extra pallar' })).not.toBeInTheDocument();
     });
   });
 

@@ -75,7 +75,7 @@ function makeExtraPallets(): { pallets: FakePallet[]; allowances: FakeAllowance[
   const placer = { full_name: 'Lars LineFeeder' };
   return {
     allowances: [
-      { id: 'a1', point_id: 'p2', max_pallets: 3, note: 'Kampanj', granted_by: 'u9', granted_at: hoursAgo(3), ended_at: null, granter: { full_name: 'Jonas Järn' } },
+      { id: 'a1', point_id: 'p2', max_pallets: 3, note: 'Kampanj', authorized_by_name: null, granted_by: 'u9', granted_at: hoursAgo(3), ended_at: null, granter: { full_name: 'Jonas Järn' } },
     ],
     pallets: [
       { id: 'pl1', point_id: 'p2', is_extra: false, image_id: null, note: null, placed_by: 'u8', placed_at: hoursAgo(2), picked_at: null, placer },
@@ -112,6 +112,7 @@ interface FakeAllowance {
   point_id: string;
   max_pallets: number;
   note: string | null;
+  authorized_by_name: string | null;
   granted_by: string;
   granted_at: string;
   ended_at: string | null;
@@ -220,6 +221,7 @@ export async function fakeSupabase(page: Page, account: FakeUser): Promise<FakeS
           point_id: String(body.point_id),
           max_pallets: Number(body.max_pallets),
           note: (body.note as string | null) ?? null,
+          authorized_by_name: (body.authorized_by_name as string | null) ?? null,
           granted_by: 'u1',
           granted_at: new Date().toISOString(),
           ended_at: null,
