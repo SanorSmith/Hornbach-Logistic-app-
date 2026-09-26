@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
+import { useDepartments } from '../hooks/useDepartments';
 import { RedPoint, PointStatus } from '../types';
 import RedPointGrid from '../components/redpoints/RedPointGrid';
 import PointActionModal from '../components/redpoints/PointActionModal';
@@ -17,7 +18,8 @@ import toast from 'react-hot-toast';
 export default function LineFeederDashboard() {
   const navigate = useNavigate();
   const { points, updatePointStatus } = useRedPoints();
-  const { assignments } = useDepartmentAssignments();
+  const { assignments, assignedDepartments } = useDepartmentAssignments();
+  const departments = useDepartments();
   // Keep only the id: the point itself always comes from the live list, so an
   // open dialog shows changes made on other devices.
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
@@ -25,6 +27,8 @@ export default function LineFeederDashboard() {
   const [showScanner, setShowScanner] = useState(false);
   const scannerDialogRef = useDialog(showScanner, () => setShowScanner(false));
   const [filterStatus, setFilterStatus] = useState<PointStatus | 'ALL'>('ALL');
+  // '' = every avdelning.
+  const [filterDepartment, setFilterDepartment] = useState('');
 
   const handlePointClick = (point: RedPoint) => {
     setSelectedPointId(point.id);
@@ -52,9 +56,12 @@ export default function LineFeederDashboard() {
   // Hardware scanners (Zebra TC2x etc.) type the code like a keyboard.
   useBarcodeScanner(handleQRScan, !showScanner);
 
-  const filteredPoints = filterStatus === 'ALL'
-    ? points
-    : points.filter(p => p.status === filterStatus);
+  // A point belongs to the avdelning it is assigned to (Admin → Tilldela punkter).
+  const filteredPoints = points.filter(
+    (p) =>
+      (filterStatus === 'ALL' || p.status === filterStatus) &&
+      (!filterDepartment || assignedDepartments[p.id] === filterDepartment)
+  );
 
   const kundorderPoints = points.filter(p => p.status === 'KUNDORDER');
   const skrapPoints = points.filter(p => p.status === 'SKRAP');
@@ -174,14 +181,41 @@ export default function LineFeederDashboard() {
                 {status === 'ALL' ? 'Alla' : status}
               </button>
             ))}
+            {departments.length > 0 && (
+              <select
+                aria-label="Avdelning"
+                value={filterDepartment}
+                onChange={(e) => setFilterDepartment(e.target.value)}
+                className={`
+                  w-full sm:w-auto sm:ml-auto px-3 py-1.5 rounded-full text-sm font-medium border transition
+                  ${filterDepartment
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                  }
+                `}
+              >
+                <option value="">Alla avdelningar</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
-        <RedPointGrid 
-            points={filteredPoints} 
+        {filteredPoints.length === 0 && points.length > 0 ? (
+          <p className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-500">
+            Inga punkter matchar filtret.
+          </p>
+        ) : (
+          <RedPointGrid
+            points={filteredPoints}
             onPointClick={handlePointClick}
             assignments={assignments}
           />
+        )}
       </div>
 
       {selectedPoint && (
