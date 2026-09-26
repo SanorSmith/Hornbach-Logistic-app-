@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Plus, Edit2, Trash2, Shield, Building2, Mail, Calendar, Search, Filter, X, Check, AlertCircle, UserPlus, UserMinus, Home } from 'lucide-react';
+import { Users, Edit2, Trash2, Search, AlertCircle, UserPlus, UserMinus, Home } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { User, UserRole, Department } from '../types';
 import toast from 'react-hot-toast';
@@ -44,8 +44,8 @@ export default function TeamManagement() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setUsers(data || []);
-    } catch (error: any) {
+      setUsers((data ?? []) as User[]);
+    } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Fel vid hämtning av användare');
     } finally {
@@ -63,7 +63,7 @@ export default function TeamManagement() {
 
       if (error) throw error;
       setDepartments(data || []);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching departments:', error);
       toast.error('Fel vid hämtning av avdelningar');
     }
@@ -87,9 +87,9 @@ export default function TeamManagement() {
       setShowCreateModal(false);
       resetForm();
       fetchUsers();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating user:', error);
-      toast.error(error.message || 'Fel vid skapande av användare');
+      toast.error((error as Error).message || 'Fel vid skapande av användare');
     }
   };
 
@@ -107,7 +107,7 @@ export default function TeamManagement() {
           role: formData.role,
           department_id: formData.department_id || null,
           is_active: formData.is_active
-        } as any)
+        })
         .eq('id', selectedUser.id);
 
       if (error) throw error;
@@ -116,7 +116,7 @@ export default function TeamManagement() {
       setShowEditModal(false);
       resetForm();
       fetchUsers();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating user:', error);
       toast.error('Fel vid uppdatering av användare');
     }
@@ -139,9 +139,9 @@ export default function TeamManagement() {
       setShowDeleteModal(false);
       setSelectedUser(null);
       fetchUsers();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting user:', error);
-      toast.error(error.message || 'Fel vid radering av användare');
+      toast.error((error as Error).message || 'Fel vid radering av användare');
     }
   };
 
@@ -149,14 +149,14 @@ export default function TeamManagement() {
     try {
       const { error } = await supabase
         .from('users')
-        .update({ is_active: !user.is_active } as any)
+        .update({ is_active: !user.is_active })
         .eq('id', user.id);
 
       if (error) throw error;
 
       toast.success(`Användare ${user.is_active ? 'inaktiverad' : 'aktiverad'}!`);
       fetchUsers();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error toggling user status:', error);
       toast.error('Fel vid ändring av användarstatus');
     }

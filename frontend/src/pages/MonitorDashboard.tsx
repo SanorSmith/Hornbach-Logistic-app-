@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Home, Activity, AlertTriangle, TrendingUp, Monitor as MonitorIcon, RefreshCw } from 'lucide-react';
+import { Home, Monitor as MonitorIcon, RefreshCw } from 'lucide-react';
 import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
 import RedPointGrid from '../components/redpoints/RedPointGrid';

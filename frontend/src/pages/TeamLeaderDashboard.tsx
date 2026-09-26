@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, TrendingUp, Users, MapPin, Activity, Clock, Package, AlertCircle, UserCheck, BarChart3 } from 'lucide-react';
+import { Home, TrendingUp, Users, MapPin, Activity, BarChart3 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { PointStatus } from '../types';
 
@@ -86,8 +86,8 @@ export default function TeamLeaderDashboard() {
         .order('full_name');
 
       if (error) throw error;
-      setLineFeeders((data as any) || []);
-    } catch (error: any) {
+      setLineFeeders(data ?? []);
+    } catch (error) {
       console.error('Error fetching line feeders:', error);
     }
   };
@@ -101,7 +101,6 @@ export default function TeamLeaderDashboard() {
       today.setHours(0, 0, 0, 0);
       
       // Get today's status changes for this user
-      // @ts-ignore - Supabase type inference issue
       const { data: statusChanges, error: changesError } = await supabase
         .from('status_history')
         .select('*')
@@ -136,7 +135,7 @@ export default function TeamLeaderDashboard() {
         lastActivity: statusChanges?.[0]?.timestamp || now.toISOString(),
         efficiency: Math.round(efficiency)
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching line feeder performance:', error);
     } finally {
       setPerformanceLoading(false);
@@ -155,13 +154,11 @@ export default function TeamLeaderDashboard() {
   const fetchStats = async () => {
     try {
       // Fetch all red points
-      // @ts-ignore - Supabase type inference issue
       const { data: points } = await supabase
         .from('red_points')
         .select('status');
 
       // Fetch active users
-      // @ts-ignore - Supabase type inference issue
       const { data: users } = await supabase
         .from('users')
         .select('is_active')
@@ -171,14 +168,12 @@ export default function TeamLeaderDashboard() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      // @ts-ignore - Supabase type inference issue
       const { count: changesCount } = await supabase
         .from('status_history')
         .select('*', { count: 'exact', head: true })
         .gte('timestamp', today.toISOString());
 
       if (points) {
-        // @ts-ignore - Supabase type inference issue
         const statusCounts = points.reduce((acc, point) => {
           const status = point.status as PointStatus;
           acc[status] = (acc[status] || 0) + 1;

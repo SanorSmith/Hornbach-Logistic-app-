@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Save, Search, Wand2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -35,18 +35,11 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
   const [bulkFrom, setBulkFrom] = useState('');
   const [bulkTo, setBulkTo] = useState('');
 
-  useEffect(() => {
-    if (isOpen && selectedDepartment) {
-      fetchPoints();
-    }
-  }, [isOpen, selectedDepartment]);
-
-  const fetchPoints = async () => {
+  const fetchPoints = useCallback(async () => {
     if (!selectedDepartment) return;
     
     setLoading(true);
     try {
-      // @ts-ignore - Supabase type inference issue
       const { data: redPoints } = await supabase
         .from('red_points')
         .select('id, point_number, department_id')
@@ -90,7 +83,13 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDepartment, departments]);
+
+  useEffect(() => {
+    if (isOpen && selectedDepartment) {
+      fetchPoints();
+    }
+  }, [isOpen, selectedDepartment, fetchPoints]);
 
   const handleAssignmentChange = (pointId: string, departmentNumber: string) => {
     setAssignments(prev => ({
@@ -135,11 +134,11 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
       toast.success('Punkttilldelningar sparade!');
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving assignments:', error);
       if (error?.code === '23505') {
         toast.error(
-          error.message?.includes('department_number')
+          (error as Error).message?.includes('department_number')
             ? 'Samma avdelningsnummer används för flera punkter'
             : 'En punkt är redan tilldelad en annan avdelning'
         );

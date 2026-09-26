@@ -5,7 +5,6 @@ import { Home, Building2, QrCode, Download, MapPin, Loader2, LayoutGrid } from '
 import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
 import { RedPoint, PointStatus } from '../types';
-import RedPointCard from '../components/redpoints/RedPointCard';
 import PointActionModal from '../components/redpoints/PointActionModal';
 import QRGenerator from '../components/qr/QRGenerator';
 import { supabase } from '../lib/supabase';
@@ -31,32 +30,31 @@ export default function DepartmentDashboard() {
   const [qrPointNumber, setQrPointNumber] = useState<number | null>(null);
   const [qrPointId, setQrPointId] = useState<string | null>(null);
 
+  const ownDepartmentId = user?.department_id;
   useEffect(() => {
-    fetchDepartments();
-  }, []);
+    const fetchDepartments = async () => {
+      try {
+        const { data } = await supabase
+          .from('departments')
+          .select('id, name, location')
+          .eq('is_active', true)
+          .order('name');
 
-  const fetchDepartments = async () => {
-    try {
-      // @ts-ignore - Supabase type inference issue
-      const { data } = await supabase
-        .from('departments')
-        .select('id, name, location')
-        .eq('is_active', true)
-        .order('name');
-
-      if (data) {
-        const list = data as { id: string; name: string; location: string }[];
-        setDepartments(list);
-        // Start on the user's own avdelning; otherwise the first one.
-        const own = list.find((d) => d.id === user?.department_id);
-        if (list.length > 0) {
-          setSelectedDepartment((current) => current || (own ?? list[0]).id);
+        if (data) {
+          const list = data as { id: string; name: string; location: string }[];
+          setDepartments(list);
+          // Start on the user's own avdelning; otherwise the first one.
+          const own = list.find((d) => d.id === ownDepartmentId);
+          if (list.length > 0) {
+            setSelectedDepartment((current) => current || (own ?? list[0]).id);
+          }
         }
+      } catch (error) {
+        console.error('Error fetching departments:', error);
       }
-    } catch (error) {
-      console.error('Error fetching departments:', error);
-    }
-  };
+    };
+    fetchDepartments();
+  }, [ownDepartmentId]);
 
   const now = useNow();
   const departmentPoints = sortPointsByName(points, assignments).filter((p) => {
@@ -82,9 +80,9 @@ export default function DepartmentDashboard() {
     setSelectedPoint(point);
   };
 
-  const handleUpdateStatus = async (status: PointStatus, notes?: string) => {
+  const handleUpdateStatus = async (status: PointStatus) => {
     if (!selectedPoint) return false;
-    return (await updatePointStatus(selectedPoint.id, status, notes)) === true;
+    return (await updatePointStatus(selectedPoint.id, status)) === true;
   };
 
   const handleGenerateQR = (pointNumber: number, pointId: string) => {

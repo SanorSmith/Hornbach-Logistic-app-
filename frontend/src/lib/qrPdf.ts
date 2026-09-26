@@ -2,6 +2,8 @@
 // grid that gives the largest codes that still fit on the page.
 // jspdf and qrcode are loaded on demand so they don't grow the main bundle.
 
+import { supabase } from './supabase';
+
 import { comparePointNames } from './pointAge';
 
 export interface QrSheetItem {
@@ -112,7 +114,6 @@ export async function downloadQrSheet(items: QrSheetItem[], heading: string, fil
  * grouped by department. Loads the points itself so any page can offer it.
  */
 export async function downloadAllPointsQrSheet() {
-  const { supabase } = await import('./supabase');
   const [pointsRes, assignmentsRes, departmentsRes] = await Promise.all([
     supabase.from('red_points').select('id, point_number, department_id').eq('is_active', true),
     supabase.from('department_point_assignments' as never).select('point_id, department_id, department_number'),

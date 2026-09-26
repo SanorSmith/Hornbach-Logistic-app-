@@ -69,12 +69,14 @@ export default function Login() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1">
               E-postadress
             </label>
             <input
               {...register('email')}
+              id="login-email"
               type="email"
+              autoComplete="username"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
               placeholder="din.email@exempel.se"
             />
@@ -90,12 +92,14 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1">
               Lösenord
             </label>
             <input
               {...register('password')}
+              id="login-password"
               type="password"
+              autoComplete="current-password"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
               placeholder="••••••••"
             />

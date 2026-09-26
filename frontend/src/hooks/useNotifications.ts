@@ -5,18 +5,37 @@ import { useAuthStore } from '../store/authStore';
 import { Notification } from '../types';
 import toast from 'react-hot-toast';
 
+async function fetchNotifications(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select(`
+        *,
+        point:red_points(point_number)
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+
+    useNotificationsStore.getState().setNotifications((data ?? []) as Notification[]);
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+  }
+}
+
 export function useNotifications() {
   const user = useAuthStore((state) => state.user);
-  const { notifications, unreadCount, setNotifications, addNotification, markAsRead } =
-    useNotificationsStore();
+  const { notifications, unreadCount, addNotification, markAsRead } = useNotificationsStore();
 
   useEffect(() => {
     if (!user) return;
 
-    fetchNotifications();
+    fetchNotifications(user.id);
 
     const channel = supabase
-      .channel('user-notifications')
+      .channel(`user-notifications-${crypto.randomUUID()}`)
       .on(
         'postgres_changes',
         {
@@ -49,33 +68,10 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
-
-  const fetchNotifications = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select(`
-          *,
-          point:red_points(point_number)
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-
-      setNotifications(data || []);
-    } catch (error: any) {
-      console.error('Error fetching notifications:', error);
-    }
-  };
+  }, [user, addNotification]);
 
   const markNotificationAsRead = async (id: string) => {
     try {
-      // @ts-ignore - Supabase type inference issue
       const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
@@ -84,7 +80,7 @@ export function useNotifications() {
       if (error) throw error;
 
       markAsRead(id);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error marking notification as read:', error);
     }
   };
@@ -93,6 +89,6 @@ export function useNotifications() {
     notifications,
     unreadCount,
     markNotificationAsRead,
-    refreshNotifications: fetchNotifications,
+    refreshNotifications: () => (user ? fetchNotifications(user.id) : Promise.resolve()),
   };
 }

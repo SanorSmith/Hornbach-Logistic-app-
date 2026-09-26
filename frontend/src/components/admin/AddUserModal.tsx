@@ -51,9 +51,9 @@ export default function AddUserModal({ isOpen, onClose, onSuccess, departments }
       });
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating user:', error);
-      toast.error(error.message || 'Fel vid skapande av användare');
+      toast.error((error as Error).message || 'Fel vid skapande av användare');
     } finally {
       setLoading(false);
     }

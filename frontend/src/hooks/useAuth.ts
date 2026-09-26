@@ -94,7 +94,6 @@ export function useAuth() {
     // Record the login time (allowed by the "update own profile" policy).
     await supabase
       .from('users')
-      // @ts-expect-error - stale Database type makes update() params `never`
       .update({ last_login: new Date().toISOString() })
       .eq('id', profile.id);
 

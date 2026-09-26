@@ -5,14 +5,49 @@ import { RedPoint } from '../types';
 import toast from 'react-hot-toast';
 import { RATE_LIMIT_MESSAGE, rateLimitSeconds } from '../lib/rateLimit';
 
+// Store actions are stable, so these can live outside the hook and the
+// effect below only runs once per mounted component.
+async function fetchRedPoints() {
+  const { setPoints, setLoading } = useRedPointsStore.getState();
+  try {
+    const { data, error } = await supabase
+      .from('red_points')
+      .select('*')
+      .eq('is_active', true)
+      .order('point_number', { ascending: true });
+
+    if (error) throw error;
+
+    setPoints((data ?? []) as RedPoint[]);
+  } catch (error) {
+    console.error('Error fetching red points:', error);
+    toast.error('Fel vid hämtning av röda punkter');
+    setLoading(false);
+  }
+}
+
+async function handleRealtimeUpdate(updatedPoint: RedPoint) {
+  const { data, error } = await supabase
+    .from('red_points')
+    .select('*')
+    .eq('id', updatedPoint.id)
+    .single();
+
+  if (!error && data) {
+    useRedPointsStore.getState().updatePoint(data as RedPoint);
+  }
+}
+
 export function useRedPoints() {
-  const { points, setPoints, updatePoint, setLoading } = useRedPointsStore();
+  const points = useRedPointsStore((state) => state.points);
 
   useEffect(() => {
     fetchRedPoints();
 
+    // A unique channel name per mount: two components using this hook at the
+    // same time must not share (and tear down) one channel.
     const channel = supabase
-      .channel('red-points-changes')
+      .channel(`red-points-changes-${crypto.randomUUID()}`)
       .on(
         'postgres_changes',
         {
@@ -33,48 +68,15 @@ export function useRedPoints() {
     };
   }, []);
 
-  const fetchRedPoints = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('red_points')
-        .select('*')
-        .eq('is_active', true)
-        .order('point_number', { ascending: true });
-
-      if (error) throw error;
-
-      setPoints((data as any) || []);
-    } catch (error: any) {
-      console.error('Error fetching red points:', error);
-      toast.error('Fel vid hämtning av röda punkter');
-      setLoading(false);
-    }
-  };
-
-  const handleRealtimeUpdate = async (updatedPoint: RedPoint) => {
-    const { data, error } = await supabase
-      .from('red_points')
-      .select('*')
-      .eq('id', updatedPoint.id)
-      .single();
-
-    if (!error && data) {
-      updatePoint(data as any);
-    }
-  };
-
   const updatePointStatus = async (
     pointId: string,
-    status: RedPoint['status'],
-    notes?: string
+    status: RedPoint['status']
   ) => {
     try {
-      const { data: user } = await supabase.auth.getUser();
-
       // Update ONLY the status field - current_user_id causes FK constraint issues
       const { error } = await supabase
         .from('red_points')
-        .update({ status } as any)
+        .update({ status })
         .eq('id', pointId);
 
       if (error) {
@@ -87,7 +89,7 @@ export function useRedPoints() {
 
       toast.success('Status uppdaterad!');
       return true;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating status:', error);
       const wait = rateLimitSeconds(error);
       if (wait !== null) {
