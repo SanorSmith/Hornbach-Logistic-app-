@@ -151,49 +151,40 @@ export default function AdminDashboard() {
     }
 
     try {
-      console.log('Clearing assignments for department:', dept);
-      
-      // Get all points assigned to this department
-      const { data: points, error: fetchError } = await supabase
-        .from('red_points')
-        .select('id, point_number')
+      // The department's point assignments (T1, T2 ...) are what the app uses.
+      const { count, error: countError } = await supabase
+        .from('department_point_assignments')
+        .select('id', { count: 'exact', head: true })
         .eq('department_id', dept.id);
+      if (countError) throw countError;
 
-      console.log('Points found:', points);
-      console.log('Fetch error:', fetchError);
+      const { error: clearError } = await supabase.rpc('save_department_assignments', {
+        p_department_id: dept.id,
+        p_assignments: [],
+      });
+      if (clearError) throw clearError;
 
-      if (fetchError) throw fetchError;
-
-      if (points && points.length > 0) {
-        // Reassign points to GM department instead of clearing
-        // First get GM department ID
-        const { data: gmDept } = await supabase
-          .from('departments')
-          .select('id')
-          .eq('name', 'GM')
-          .single();
-
-        if (gmDept) {
-          const { error: updateError } = await supabase
-            .from('red_points')
-            .update({ department_id: gmDept.id })
-            .eq('department_id', dept.id);
-
-          console.log('Update error:', updateError);
-
-          if (updateError) throw updateError;
-
-          alert(`Omtilldelade ${points.length} punkter till GM-avdelningen från ${dept.name}`);
-          fetchData();
-        } else {
-          throw new Error('GM department not found');
-        }
-      } else {
-        alert(`Inga tilldelningar att ta bort från ${dept.name}`);
+      // Points that still have this department as their fallback go to GM.
+      const { data: gmDept } = await supabase
+        .from('departments')
+        .select('id')
+        .eq('name', 'GM')
+        .maybeSingle();
+      if (gmDept && gmDept.id !== dept.id) {
+        const { error: moveError } = await supabase
+          .from('red_points')
+          .update({ department_id: gmDept.id })
+          .eq('department_id', dept.id);
+        if (moveError) throw moveError;
       }
+
+      toast.success(
+        count ? `Tog bort ${count} tilldelningar från ${dept.name}` : `Inga tilldelningar att ta bort från ${dept.name}`
+      );
+      fetchData();
     } catch (error) {
-      alert('Kunde inte ta bort tilldelningar');
       console.error('Clear assignments error:', error);
+      toast.error('Kunde inte ta bort tilldelningar');
     }
   };
 
