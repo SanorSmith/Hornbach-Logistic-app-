@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, TrendingUp, Users, MapPin, Activity, BarChart3 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 import { PointStatus } from '../types';
 
 interface Stats {
@@ -146,24 +147,28 @@ export default function TeamLeaderDashboard() {
   const fetchStats = async () => {
     try {
       // Fetch all red points
-      const { data: points } = await supabase
+      const { data: points, error: pointsError } = await supabase
         .from('red_points')
         .select('status');
+      if (pointsError) throw pointsError;
 
       // Fetch active users
-      const { data: users } = await supabase
+      const { data: users, error: usersError } = await supabase
         .from('users')
         .select('is_active')
         .eq('is_active', true);
+      if (usersError) throw usersError;
 
       // Fetch today's status changes
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
-      const { count: changesCount } = await supabase
+
+      const { count: changesCount, error: changesError } = await supabase
         .from('status_history')
         .select('*', { count: 'exact', head: true })
         .gte('timestamp', today.toISOString());
+      // A failed query must not show up as "0" in the stats.
+      if (changesError) throw changesError;
 
       if (points) {
         const statusCounts = points.reduce((acc, point) => {
@@ -186,6 +191,7 @@ export default function TeamLeaderDashboard() {
       setLoading(false);
     } catch (error) {
       console.error('Error fetching stats:', error);
+      toast.error('Fel vid hämtning av data');
       setLoading(false);
     }
   };

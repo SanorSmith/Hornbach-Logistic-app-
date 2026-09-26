@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 
 const mock = await vi.hoisted(async () => (await import('../test/supabaseMock')).createSupabaseMock());
 vi.mock('../lib/supabase', () => ({ supabase: mock.supabase }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: toast }));
 
-import { useAuth } from './useAuth';
+import { useAuth, useAuthListener } from './useAuth';
 import { useAuthStore } from '../store/authStore';
+import type { User } from '../types';
 
 const authUser = { id: 'u1', email: 'anna@hornbach.se' };
 const profile = (extra: Record<string, unknown> = {}) => ({
@@ -78,5 +79,60 @@ describe('useAuth.signIn', () => {
     mock.respond('users', { data: null });
     expect(await signIn()).toBeNull();
     expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('saknar användarprofil'));
+  });
+
+  it('does not call a failed profile query a missing profile', async () => {
+    mock.respond('users', { error: { message: 'Failed to fetch' } });
+    expect(await signIn()).toBeNull();
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Kunde inte läsa användarprofilen'));
+    expect(toast.error).not.toHaveBeenCalledWith(expect.stringContaining('saknar användarprofil'));
+    expect(mock.supabase.auth.signOut).toHaveBeenCalled();
+  });
+});
+
+describe('useAuth.refreshProfile', () => {
+  it('keeps the current user when the profile cannot be read', async () => {
+    const current = profile() as unknown as User;
+    useAuthStore.setState({ user: current, supabaseUser: authUser as never, isLoading: false });
+    mock.supabase.auth.getUser.mockResolvedValue({ data: { user: authUser } });
+    mock.respond('users', { error: { message: 'Failed to fetch' } });
+
+    const { result } = renderHook(() => useAuth());
+    let returned: unknown = 'unset';
+    await act(async () => {
+      returned = await result.current.refreshProfile();
+    });
+    expect(returned).toBeNull();
+    expect(useAuthStore.getState().user).toBe(current);
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Kunde inte läsa användarprofilen'));
+  });
+});
+
+describe('useAuthListener', () => {
+  type AuthCallback = (event: string, session: { user: typeof authUser } | null) => void;
+  const listen = () => {
+    renderHook(() => useAuthListener());
+    const calls = mock.supabase.auth.onAuthStateChange.mock.calls as unknown as [AuthCallback][];
+    return calls[calls.length - 1][0];
+  };
+
+  it('tells the user when a saved session’s profile cannot be read', async () => {
+    useAuthStore.setState({ user: null, supabaseUser: null, isLoading: true });
+    mock.respond('users', { error: { message: 'Failed to fetch' } });
+    listen()('INITIAL_SESSION', { user: authUser });
+
+    await waitFor(() => expect(useAuthStore.getState().isLoading).toBe(false));
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Kunde inte läsa användarprofilen'));
+    expect(mock.supabase.auth.signOut).not.toHaveBeenCalled();
+  });
+
+  it('keeps the loaded user when a later profile reload fails', async () => {
+    const current = profile() as unknown as User;
+    useAuthStore.setState({ user: current, supabaseUser: authUser as never, isLoading: false });
+    mock.respond('users', { error: { message: 'Failed to fetch' } });
+    listen()('USER_UPDATED', { user: authUser });
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(useAuthStore.getState().user).toBe(current);
   });
 });

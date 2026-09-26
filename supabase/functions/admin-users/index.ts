@@ -20,6 +20,7 @@
 //     -> { deleted: true, users: n, photos: n }   (confirm_code must equal the store number)
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { deactivateUser } from './deactivate.ts';
 
 const ROLES = ['ADMIN', 'TEAM_LEADER', 'LINEFEEDER', 'MONITOR', 'DEPARTMENT'] as const;
 type Role = (typeof ROLES)[number];
@@ -311,8 +312,10 @@ Deno.serve(async (req) => {
     if (deleteError) {
       // User is referenced by status history / notifications: keep the row
       // for the audit trail, deactivate it and block sign-in instead.
-      await admin.from('users').update({ is_active: false }).eq('id', userId);
-      await admin.auth.admin.updateUserById(userId, { ban_duration: '876000h' });
+      const failure = await deactivateUser(admin, userId);
+      if (failure) {
+        return json({ error: friendlyError(failure.context, failure.error, 'Kunde inte inaktivera användaren. Försök igen.') }, 400);
+      }
       return json({ deactivated: true });
     }
 

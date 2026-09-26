@@ -79,7 +79,14 @@ export default function ReportsPage() {
       .select('id, name')
       .eq('is_active', true)
       .order('name')
-      .then(({ data }) => setDepartments((data as { id: string; name: string }[]) ?? []));
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error fetching departments:', error);
+          toast.error('Fel vid hämtning av avdelningar');
+          return;
+        }
+        setDepartments((data as { id: string; name: string }[]) ?? []);
+      });
   }, []);
 
   useEffect(() => {

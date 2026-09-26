@@ -15,6 +15,13 @@ export const HOME_ROUTE: Record<UserRole, string> = {
   DEPARTMENT: '/department',
 };
 
+const PROFILE_LOAD_ERROR = 'Kunde inte läsa användarprofilen. Kontrollera anslutningen och försök igen.';
+
+/**
+ * The user's profile, or null when the account has none.
+ * Throws when the query itself fails, so a network or session error is not
+ * mistaken for a missing profile.
+ */
 async function loadProfile(authUser: SupabaseUser): Promise<User | null> {
   const { data, error } = await supabase
     .from('users')
@@ -24,7 +31,7 @@ async function loadProfile(authUser: SupabaseUser): Promise<User | null> {
 
   if (error) {
     console.error('Error fetching user profile:', error);
-    return null;
+    throw error;
   }
   return (data as User | null) ?? null;
 }
@@ -62,7 +69,19 @@ export function useAuthListener() {
         const authUser = session.user;
         // Defer Supabase calls out of the auth callback to avoid a client deadlock.
         setTimeout(async () => {
-          const profile = await loadProfile(authUser);
+          let profile: User | null;
+          try {
+            profile = await loadProfile(authUser);
+          } catch {
+            if (eventNumber !== latestEvent) return;
+            // signIn() reports its own failure for fresh logins.
+            if (event !== 'SIGNED_IN') toast.error(PROFILE_LOAD_ERROR);
+            // Keep a profile we already have (e.g. on USER_UPDATED) rather than
+            // dropping the user because of a passing network error.
+            const current = useAuthStore.getState().user;
+            setUser(current?.id === authUser.id ? current : null, authUser);
+            return;
+          }
           if (eventNumber !== latestEvent) return;
 
           // A saved session (app reopened) gets the same checks as a new login.
@@ -95,7 +114,14 @@ export function useAuth() {
       return null;
     }
 
-    const profile = await loadProfile(data.user);
+    let profile: User | null;
+    try {
+      profile = await loadProfile(data.user);
+    } catch {
+      toast.error(PROFILE_LOAD_ERROR);
+      await supabase.auth.signOut();
+      return null;
+    }
     if (!profile) {
       toast.error('Kontot saknar användarprofil. Kontakta administratören.');
       await supabase.auth.signOut();
@@ -123,7 +149,14 @@ export function useAuth() {
   const refreshProfile = async () => {
     const { data } = await supabase.auth.getUser();
     if (!data.user) return null;
-    const profile = await loadProfile(data.user);
+    let profile: User | null;
+    try {
+      profile = await loadProfile(data.user);
+    } catch {
+      // Keep the current user signed in; they can try again.
+      toast.error(PROFILE_LOAD_ERROR);
+      return null;
+    }
     useAuthStore.getState().setUser(profile, data.user);
     return profile;
   };

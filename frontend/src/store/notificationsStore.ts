@@ -24,12 +24,16 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
       unreadCount: !notification.is_read ? state.unreadCount + 1 : state.unreadCount,
     })),
   markAsRead: (id) =>
-    set((state) => ({
-      notifications: state.notifications.map((n) =>
-        n.id === id ? { ...n, is_read: true } : n
-      ),
-      unreadCount: Math.max(0, state.unreadCount - 1),
-    })),
+    set((state) => {
+      // Only an unread notification lowers the count, so repeat calls are harmless.
+      const wasUnread = state.notifications.some((n) => n.id === id && !n.is_read);
+      return {
+        notifications: state.notifications.map((n) =>
+          n.id === id ? { ...n, is_read: true } : n
+        ),
+        unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount,
+      };
+    }),
   markAllAsRead: () =>
     set((state) => ({
       notifications: state.notifications.map((n) => ({ ...n, is_read: true })),

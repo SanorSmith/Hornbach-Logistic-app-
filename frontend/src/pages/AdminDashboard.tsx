@@ -61,20 +61,24 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       // Fetch users
-      const { data: usersData } = await supabase
+      const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('*')
         .order('created_at', { ascending: false });
+      if (usersError) throw usersError;
 
       // Fetch departments
-      const { data: deptsData } = await supabase
+      const { data: deptsData, error: deptsError } = await supabase
         .from('departments')
         .select('*');
+      if (deptsError) throw deptsError;
 
       // Fetch red points count
-      const { count: pointsCount } = await supabase
+      const { count: pointsCount, error: pointsError } = await supabase
         .from('red_points')
         .select('*', { count: 'exact', head: true });
+      // A failed query must not show up as "0" in the stats.
+      if (pointsError) throw pointsError;
 
       if (usersData) setUsers(usersData);
       if (deptsData) setDepartments(deptsData);
