@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 
 export function useDepartmentAssignments() {
@@ -10,19 +11,13 @@ export function useDepartmentAssignments() {
   const hasFetched = useRef(false);
 
   const fetchAllAssignments = async () => {
-    if (hasFetched.current) return;
-    hasFetched.current = true;
-    
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('department_point_assignments')
         .select('point_id, department_number, department_id');
 
-      if (error) {
-        console.error('Supabase error:', error);
-        return;
-      }
+      if (error) throw error;
 
       if (data) {
         const rows = data as { point_id: string; department_number: string; department_id: string }[];
@@ -40,12 +35,17 @@ export function useDepartmentAssignments() {
       }
     } catch (error) {
       console.error('Error fetching assignments:', error);
+      // Without this the boards would just show no department numbers.
+      toast.error('Kunde inte hämta avdelningsnummer');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    // Skip the second mount-effect run in StrictMode; refetch always loads.
+    if (hasFetched.current) return;
+    hasFetched.current = true;
     fetchAllAssignments();
   }, []);
 

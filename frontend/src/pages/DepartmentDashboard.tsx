@@ -45,11 +45,12 @@ export default function DepartmentDashboard() {
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('departments')
           .select('id, name, location')
           .eq('is_active', true)
           .order('name');
+        if (error) throw error;
 
         if (data) {
           const list = data as { id: string; name: string; location: string }[];
@@ -62,6 +63,7 @@ export default function DepartmentDashboard() {
         }
       } catch (error) {
         console.error('Error fetching departments:', error);
+        toast.error('Fel vid hämtning av avdelningar');
       }
     };
     fetchDepartments();
