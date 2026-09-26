@@ -196,20 +196,20 @@ describe('PointActionModal', () => {
       expect(grantAllowance).not.toHaveBeenCalled(); // nothing saved before confirming
       await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Antal pallar' }), '4');
       await userEvent.type(screen.getByRole('textbox', { name: 'Anledning (valfritt)' }), 'Kampanj');
-      expect(screen.queryByRole('textbox', { name: 'Godkänt av' })).not.toBeInTheDocument();
+      await userEvent.type(screen.getByRole('textbox', { name: 'Godkänt av' }), 'Anna Avdelning');
       await userEvent.click(screen.getByRole('button', { name: 'Bekräfta' }));
 
-      await waitFor(() => expect(grantAllowance).toHaveBeenCalledWith('p1', 4, 'Kampanj', undefined));
+      await waitFor(() => expect(grantAllowance).toHaveBeenCalledWith('p1', 4, 'Kampanj', 'Anna Avdelning'));
     });
 
-    it('on the LineFeeder side, needs the name of whoever authorized it', async () => {
+    it('always needs the name of whoever authorized it before it can be confirmed', async () => {
       render(
         <PointActionModal
           point={makePoint({ id: 'p1' })}
           onClose={() => {}}
           onUpdateStatus={vi.fn()}
           allowedActions={[...ALL]}
-          palletAccess={{ canGrant: true, grantNeedsAuthorizer: true }}
+          palletAccess={{ canGrant: true }}
         />
       );
       await userEvent.click(screen.getByRole('button', { name: 'Tillåt extra pallar' }));

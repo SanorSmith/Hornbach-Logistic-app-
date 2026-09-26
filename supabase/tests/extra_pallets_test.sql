@@ -1,6 +1,8 @@
 -- Tests for migrations/20260926130000_extra_pallets.sql,
 -- 20260926150000_extra_pallets_rules.sql and
--- 20260926170000_extra_pallets_authorized_by.sql.
+-- 20260926170000_extra_pallets_authorized_by.sql,
+-- 20260926190000_extra_pallets_linefeeder_only.sql and
+-- 20260926210000_extra_pallets_name_required.sql.
 --
 -- Run the migrations not yet applied and then this file as ONE batch (one transaction), e.g.
 -- through the Supabase SQL editor or the MCP execute_sql tool. The script
@@ -109,11 +111,12 @@ begin
   -- 3. Who may grant (20260926190000_extra_pallets_linefeeder_only.sql): not the
   --    avdelning, not even on its own point, not Monitor; a LineFeeder only
   --    with the name of whoever authorized it.
+  --    (With a name, so it is row level security, not the missing name, that refuses.)
   perform pg_temp.act_as(dep);
-  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 3)', p1), 'row-level security');
-  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 3)', p2), 'row-level security');
+  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets, authorized_by_name) values (%L, 3, %L)', p1, 'Anna'), 'row-level security');
+  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets, authorized_by_name) values (%L, 3, %L)', p2, 'Anna'), 'row-level security');
   perform pg_temp.act_as(mon);
-  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 3)', p1), 'row-level security');
+  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets, authorized_by_name) values (%L, 3, %L)', p1, 'Anna'), 'row-level security');
   perform pg_temp.act_as(lf);
   perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 3)', p1), 'AUTHORIZED_BY_REQUIRED');
   perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets, authorized_by_name) values (%L, 3, %L)', p1, '   '), 'AUTHORIZED_BY_REQUIRED');
@@ -222,7 +225,11 @@ begin
   perform pg_temp.cool_down(lf);
   perform pg_temp.act_as(tl);
   update public.red_points set status = 'UPPTAGEN' where id = p2;
-  insert into public.point_allowances (point_id, max_pallets) values (p2, 2) returning id into v_allow2;
+  -- Team leaders and admins must name who authorized it too
+  -- (20260926210000_extra_pallets_name_required.sql).
+  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 2)', p2), 'AUTHORIZED_BY_REQUIRED');
+  insert into public.point_allowances (point_id, max_pallets, authorized_by_name)
+    values (p2, 2, 'Bengt Bygg') returning id into v_allow2;
   perform pg_temp.act_as(lf);
   insert into public.point_pallets (point_id, note) values (p2, 'extra on T2');
   update public.red_points set status = 'SKRAP' where id = p2;
