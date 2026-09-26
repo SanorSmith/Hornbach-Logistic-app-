@@ -70,7 +70,7 @@ describe('PointPalletsPanel', () => {
     setPallets([pallet('x')], [allowance]);
     render(<PointPalletsPanel point={point} canPick />);
 
-    expect(screen.getByText(/kan bara minskas eller avslutas av LineFeeder eller teamledare/)).toBeInTheDocument();
+    expect(screen.getByText('Tillståndet hanteras av LineFeeder.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Avsluta tillstånd' })).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Max pallar' })).not.toBeInTheDocument();
   });
@@ -81,7 +81,7 @@ describe('PointPalletsPanel', () => {
     expect(screen.getByText(/max 3\) av Anna Avdelning \(reg\. Lars LineFeeder\)/)).toBeInTheDocument();
   });
 
-  it('lets a LineFeeder lower the maximum, but not raise it', async () => {
+  it('without canRaise, only offers to lower the maximum', async () => {
     setPallets([pallet('x')], [allowance]);
     render(<PointPalletsPanel point={point} canChange />);
 
@@ -94,7 +94,7 @@ describe('PointPalletsPanel', () => {
     expect(mock.calls).toContainEqual({ table: 'point_allowances', method: 'update', args: [{ max_pallets: 2 }] });
   });
 
-  it('lets a team leader raise the maximum', () => {
+  it('with canRaise (LineFeeder, team leader), also offers to raise the maximum', () => {
     setPallets([pallet('x')], [allowance]);
     render(<PointPalletsPanel point={point} canChange canRaise />);
     const options = within(screen.getByRole('combobox', { name: 'Max pallar' })).getAllByRole('option');

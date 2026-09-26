@@ -245,11 +245,12 @@ export default function LineFeederDashboard() {
           palletAccess={{
             canPlace: true,
             canPick: true,
-            // A LineFeeder registers extra pallets for the avdelning and names who approved them.
+            // Only the LineFeeder handles extra pallets: grants them (naming who
+            // approved them), raises or lowers the maximum, and ends them.
             canGrant: true,
             grantNeedsAuthorizer: !isLeader,
             canChange: true,
-            canRaise: isLeader,
+            canRaise: true,
           }}
         />
       )}

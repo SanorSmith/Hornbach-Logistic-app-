@@ -24,15 +24,15 @@ export interface PalletAccess {
   /** Mark a pallet as picked. */
   canPick?: boolean;
   /**
-   * "Tillåt extra pallar" (the point's own avdelning, LineFeeder, team leader,
-   * admin). Shown in the dialog under the status buttons.
+   * "Tillåt extra pallar" (LineFeeder, team leader, admin; never the
+   * avdelning). Shown in the dialog under the status buttons.
    */
   canGrant?: boolean;
   /** LineFeeder side: who authorized the privilege must be filled in. */
   grantNeedsAuthorizer?: boolean;
   /** Lower the maximum or end the privilege (LineFeeder, team leader, admin). */
   canChange?: boolean;
-  /** Raise the maximum (team leader, admin). */
+  /** Raise the maximum (LineFeeder, team leader, admin). */
   canRaise?: boolean;
 }
 
@@ -80,7 +80,7 @@ export default function PointPalletsPanel({
   if (!allowance && open.length <= 1) return null;
 
   const shownMax = newMax ?? allowance?.max_pallets ?? MIN_PALLETS;
-  // A LineFeeder may only lower what the avdelning allowed, never below what stands there.
+  // Never below what stands on the point; above the current maximum only with canRaise.
   const maxOptions = allowance
     ? range(Math.max(MIN_PALLETS, open.length), canRaise ? MAX_PALLETS : allowance.max_pallets)
     : [];
@@ -115,9 +115,7 @@ export default function PointPalletsPanel({
           Extra pallar tillåtna (max {allowance.max_pallets}) av {allowanceAuthorizer(allowance)},{' '}
           {ago(allowance.granted_at)}.
           {allowance.note && <span className="block italic">”{allowance.note}”</span>}
-          {!canChange && (
-            <span className="block">Tillståndet kan bara minskas eller avslutas av LineFeeder eller teamledare.</span>
-          )}
+          {!canChange && <span className="block">Tillståndet hanteras av LineFeeder.</span>}
         </p>
       )}
 
