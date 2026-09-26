@@ -6,22 +6,29 @@ import { useRedPointsStore } from '../store/redPointsStore';
 import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
 import { usePallets } from '../hooks/usePallets';
+import { usePointFilters } from '../hooks/usePointFilters';
 import RedPointGrid from '../components/redpoints/RedPointGrid';
+import PointFilterBar from '../components/redpoints/PointFilterBar';
 import PointImagesViewer from '../components/redpoints/PointImagesViewer';
 import { PointStatus } from '../types';
 
 export default function MonitorDashboard() {
   const navigate = useNavigate();
-  const { points } = useRedPoints();
-  const { assignments } = useDepartmentAssignments();
+  const { points: allPoints } = useRedPoints();
+  const { assignments, assignedDepartments } = useDepartmentAssignments();
   usePallets();
+  // Remembered on this screen: a Monitor often hangs by one avdelning. The
+  // avdelning narrows the whole page; the status only the grid.
+  const filters = usePointFilters('monitor');
+  const points = allPoints.filter((p) => filters.inDepartment(p, assignedDepartments));
+  const gridPoints = points.filter((p) => filters.matches(p, assignedDepartments));
   // When the data last changed, not a ticking clock: re-rendering the whole
   // grid every second wore out low-power screens left on all day.
   const lastSyncedAt = useRedPointsStore((state) => state.lastSyncedAt);
   // Keep only the id: the point itself always comes from the live list, so an
   // open dialog shows status changes made on other devices.
   const [viewedPointId, setViewedPointId] = useState<string | null>(null);
-  const viewedPoint = points.find((p) => p.id === viewedPointId) ?? null;
+  const viewedPoint = allPoints.find((p) => p.id === viewedPointId) ?? null;
 
   const statusCounts = points.reduce((acc, point) => {
     acc[point.status] = (acc[point.status] || 0) + 1;
@@ -154,12 +161,19 @@ export default function MonitorDashboard() {
         <div className="bg-gray-800 rounded-lg p-6">
           <h2 className="text-xl font-bold mb-1">Alla Punkter (Endast Visning)</h2>
           <p className="text-sm text-gray-400 mb-4">Klicka på en punkt för att se de senaste bilderna.</p>
-          <RedPointGrid
-            points={points}
-            onPointClick={(point) => setViewedPointId(point.id)} // read-only: shows the latest photos
-            assignments={assignments}
-            showPalletAuthorizer
-          />
+          <div className="mb-4">
+            <PointFilterBar filters={filters} dark />
+          </div>
+          {gridPoints.length === 0 && allPoints.length > 0 ? (
+            <p className="p-6 text-center text-gray-400">Inga punkter matchar filtret.</p>
+          ) : (
+            <RedPointGrid
+              points={gridPoints}
+              onPointClick={(point) => setViewedPointId(point.id)} // read-only: shows the latest photos
+              assignments={assignments}
+              showPalletAuthorizer
+            />
+          )}
         </div>
 
         {viewedPoint && (

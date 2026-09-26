@@ -154,6 +154,27 @@ test.describe('Avdelning dashboard', () => {
 });
 
 test.describe('Extra pallets', () => {
+  test('the Monitor narrows to one avdelning and status, remembered on the screen', async ({ page }) => {
+    await fakeSupabase(page, { role: 'MONITOR' });
+    await logIn(page);
+    await expect(cardTitles(page)).toHaveCount(6);
+
+    await page.getByRole('combobox', { name: 'Avdelning' }).selectOption({ label: 'Bygg' });
+    await expect(cardTitles(page)).toHaveText(['IB2', 'IB1', 'IB3']);
+    await expect(page.getByText('Totalt 3 punkter')).toBeVisible(); // the counts follow the avdelning
+    await page.getByRole('button', { name: 'LEDIG', exact: true }).click();
+    await expect(cardTitles(page)).toHaveText(['IB3']);
+
+    await page.reload();
+    await expect(page.getByRole('combobox', { name: 'Avdelning' })).toHaveValue('d-bygg');
+    await expect(cardTitles(page)).toHaveText(['IB3']);
+
+    await page.getByRole('button', { name: 'Alla', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Avdelning' }).selectOption({ label: 'Alla avdelningar' });
+    await expect(cardTitles(page)).toHaveCount(6);
+    await expect(page.getByText('Totalt 6 punkter')).toBeVisible();
+  });
+
   test('the Monitor shows who authorized the extra pallets on the card', async ({ page }) => {
     await fakeSupabase(page, { role: 'MONITOR', extraPallets: true });
     await logIn(page);

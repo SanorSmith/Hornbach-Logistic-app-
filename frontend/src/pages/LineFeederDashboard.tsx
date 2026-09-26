@@ -4,26 +4,23 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
-import { useDepartments } from '../hooks/useDepartments';
 import { usePallets } from '../hooks/usePallets';
-import { useDeviceSetting } from '../hooks/useDeviceSetting';
+import { usePointFilters } from '../hooks/usePointFilters';
 import { RedPoint, PointStatus } from '../types';
 import RedPointGrid from '../components/redpoints/RedPointGrid';
+import PointFilterBar from '../components/redpoints/PointFilterBar';
 import PointActionModal from '../components/redpoints/PointActionModal';
 import QRScanner from '../components/qr/QRScanner';
-import { QrCode, Home, Filter } from 'lucide-react';
+import { QrCode, Home } from 'lucide-react';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { findPointByScan } from '../lib/scanLookup';
 import ScannerReadyBadge from '../components/redpoints/ScannerReadyBadge';
 import toast from 'react-hot-toast';
 
-const STATUS_FILTERS = ['ALL', 'KUNDORDER', 'SKRAP', 'UPPTAGEN', 'LEDIG'] as const;
-
 export default function LineFeederDashboard() {
   const navigate = useNavigate();
   const { points, updatePointStatus } = useRedPoints();
   const { assignments, assignedDepartments } = useDepartmentAssignments();
-  const departments = useDepartments();
   usePallets();
   // Keep only the id: the point itself always comes from the live list, so an
   // open dialog shows changes made on other devices.
@@ -31,16 +28,8 @@ export default function LineFeederDashboard() {
   const selectedPoint = points.find((p) => p.id === selectedPointId) ?? null;
   const [showScanner, setShowScanner] = useState(false);
   const scannerDialogRef = useDialog(showScanner, () => setShowScanner(false));
-  // Remembered on this device too; anything unknown falls back to every status.
-  const [storedStatus, setFilterStatus] = useDeviceSetting('linefeeder.status');
-  const filterStatus: PointStatus | 'ALL' = (STATUS_FILTERS as readonly string[]).includes(storedStatus)
-    ? (storedStatus as PointStatus | 'ALL')
-    : 'ALL';
-  // '' = every avdelning. Remembered on this device: a handheld usually serves
-  // the same avdelning. A remembered avdelning that no longer exists is ignored.
-  const [storedDepartment, setFilterDepartment] = useDeviceSetting('linefeeder.avdelning');
-  const filterDepartment =
-    departments.length === 0 || departments.some((d) => d.id === storedDepartment) ? storedDepartment : '';
+  // Status and avdelning, remembered on this device.
+  const filters = usePointFilters('linefeeder');
 
   const handlePointClick = (point: RedPoint) => {
     setSelectedPointId(point.id);
@@ -68,12 +57,7 @@ export default function LineFeederDashboard() {
   // Hardware scanners (Zebra TC2x etc.) type the code like a keyboard.
   useBarcodeScanner(handleQRScan, !showScanner);
 
-  // A point belongs to the avdelning it is assigned to (Admin → Tilldela punkter).
-  const filteredPoints = points.filter(
-    (p) =>
-      (filterStatus === 'ALL' || p.status === filterStatus) &&
-      (!filterDepartment || assignedDepartments[p.id] === filterDepartment)
-  );
+  const filteredPoints = points.filter((p) => filters.matches(p, assignedDepartments));
 
   const kundorderPoints = points.filter(p => p.status === 'KUNDORDER');
   const skrapPoints = points.filter(p => p.status === 'SKRAP');
@@ -175,46 +159,7 @@ export default function LineFeederDashboard() {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter size={20} className="text-gray-600" />
-            <span className="text-sm font-medium text-gray-700">Filtrera:</span>
-            {STATUS_FILTERS.map((status) => (
-              <button
-                key={status}
-                onClick={() => setFilterStatus(status === 'ALL' ? '' : status)}
-                className={`
-                  px-3 py-1 rounded-full text-sm font-medium transition
-                  ${filterStatus === status
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }
-                `}
-              >
-                {status === 'ALL' ? 'Alla' : status}
-              </button>
-            ))}
-            {departments.length > 0 && (
-              <select
-                aria-label="Avdelning"
-                value={filterDepartment}
-                onChange={(e) => setFilterDepartment(e.target.value)}
-                className={`
-                  w-full sm:w-auto sm:ml-auto px-3 py-1.5 rounded-full text-sm font-medium border transition
-                  ${filterDepartment
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
-                  }
-                `}
-              >
-                <option value="">Alla avdelningar</option>
-                {departments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+          <PointFilterBar filters={filters} />
         </div>
 
         {filteredPoints.length === 0 && points.length > 0 ? (
