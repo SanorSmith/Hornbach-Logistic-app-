@@ -34,7 +34,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
-  const [editingDepartment, setEditingDepartment] = useState<any>(null);
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [downloadingQr, setDownloadingQr] = useState(false);
 
@@ -57,20 +57,17 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       // Fetch users
-      // @ts-ignore - Supabase type inference issue
       const { data: usersData } = await supabase
         .from('users')
         .select('*')
         .order('created_at', { ascending: false });
 
       // Fetch departments
-      // @ts-ignore - Supabase type inference issue
       const { data: deptsData } = await supabase
         .from('departments')
         .select('*');
 
       // Fetch red points count
-      // @ts-ignore - Supabase type inference issue
       const { count: pointsCount } = await supabase
         .from('red_points')
         .select('*', { count: 'exact', head: true });
@@ -80,7 +77,6 @@ export default function AdminDashboard() {
 
       setStats({
         totalUsers: usersData?.length || 0,
-        // @ts-ignore - Supabase type inference issue
         activeUsers: usersData?.filter(u => u.is_active).length || 0,
         totalDepartments: deptsData?.length || 0,
         totalPoints: pointsCount || 0,
@@ -96,7 +92,6 @@ export default function AdminDashboard() {
 
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      // @ts-ignore - Supabase type inference issue
       const { error } = await supabase
         .from('users')
         .update({ is_active: !currentStatus })
@@ -107,28 +102,28 @@ export default function AdminDashboard() {
       toast.success(`Användare ${!currentStatus ? 'aktiverad' : 'inaktiverad'}`);
       fetchData();
     } catch (error) {
+      console.error('Toggle user status error:', error);
       toast.error('Kunde inte ändra användarstatus');
     }
   };
 
-  const handleEditUser = (user: any) => {
+  const handleEditUser = (user: User) => {
     // TODO: Implement edit user functionality
     toast('Redigera användare via Teamhantering', { icon: 'ℹ️' });
     navigate('/team');
     console.log('Edit user:', user);
   };
 
-  const handleEditDepartment = (dept: any) => {
+  const handleEditDepartment = (dept: Department) => {
     setEditingDepartment(dept);
   };
 
-  const handleDeleteDepartment = async (dept: any) => {
+  const handleDeleteDepartment = async (dept: Department) => {
     if (!confirm(`Är du säker på att du vill radera avdelning "${dept.name}"?`)) {
       return;
     }
 
     try {
-      // @ts-ignore - Supabase type inference issue
       const { error } = await supabase
         .from('departments')
         .delete()
@@ -150,7 +145,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleClearDepartmentAssignments = async (dept: any) => {
+  const handleClearDepartmentAssignments = async (dept: Department) => {
     if (!confirm(`Är du säker på att du vill ta bort alla tilldelningar från "${dept.name}"?`)) {
       return;
     }
@@ -159,7 +154,6 @@ export default function AdminDashboard() {
       console.log('Clearing assignments for department:', dept);
       
       // Get all points assigned to this department
-      // @ts-ignore - Supabase type inference issue
       const { data: points, error: fetchError } = await supabase
         .from('red_points')
         .select('id, point_number')
@@ -173,7 +167,6 @@ export default function AdminDashboard() {
       if (points && points.length > 0) {
         // Reassign points to GM department instead of clearing
         // First get GM department ID
-        // @ts-ignore - Supabase type inference issue
         const { data: gmDept } = await supabase
           .from('departments')
           .select('id')
@@ -181,7 +174,6 @@ export default function AdminDashboard() {
           .single();
 
         if (gmDept) {
-          // @ts-ignore - Supabase type inference issue
           const { error: updateError } = await supabase
             .from('red_points')
             .update({ department_id: gmDept.id })
@@ -209,7 +201,6 @@ export default function AdminDashboard() {
     if (!editingDepartment) return;
 
     try {
-      // @ts-ignore - Supabase type inference issue
       const { error } = await supabase
         .from('departments')
         .update({
@@ -230,7 +221,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteUser = async (user: any) => {
+  const handleDeleteUser = async (user: User) => {
     if (!confirm(`Är du säker på att du vill radera ${user.full_name}?`)) {
       return;
     }
@@ -249,8 +240,8 @@ export default function AdminDashboard() {
       setTimeout(() => {
         fetchData();
       }, 500);
-    } catch (error: any) {
-      toast.error(error?.message || 'Kunde inte radera användare');
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Kunde inte radera användare');
       console.error('Delete user error:', error);
     }
   };

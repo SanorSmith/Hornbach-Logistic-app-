@@ -23,7 +23,6 @@ export default function AddDepartmentModal({ isOpen, onClose, onSuccess }: AddDe
     setLoading(true);
 
     try {
-      // @ts-ignore - Supabase type inference issue
       const { error } = await supabase
         .from('departments')
         .insert({
@@ -38,9 +37,9 @@ export default function AddDepartmentModal({ isOpen, onClose, onSuccess }: AddDe
       setFormData({ name: '', location: '' });
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating department:', error);
-      toast.error(error.message || 'Fel vid skapande av avdelning');
+      toast.error((error as Error).message || 'Fel vid skapande av avdelning');
     } finally {
       setLoading(false);
     }

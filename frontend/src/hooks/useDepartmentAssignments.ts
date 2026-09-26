@@ -17,7 +17,6 @@ export function useDepartmentAssignments() {
       setLoading(true);
       console.log('Starting to fetch assignments...');
       
-      // @ts-ignore - Supabase type inference issue
       const { data, error } = await supabase
         .from('department_point_assignments')
         .select('point_id, department_number, department_id');

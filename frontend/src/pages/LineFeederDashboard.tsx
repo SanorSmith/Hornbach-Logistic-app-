@@ -25,9 +25,9 @@ export default function LineFeederDashboard() {
     setSelectedPoint(point);
   };
 
-  const handleUpdateStatus = async (status: PointStatus, notes?: string) => {
+  const handleUpdateStatus = async (status: PointStatus) => {
     if (!selectedPoint) return false;
-    return (await updatePointStatus(selectedPoint.id, status, notes)) === true;
+    return (await updatePointStatus(selectedPoint.id, status)) === true;
   };
 
   // Camera or hardware scanner (Zebra): open the scanned point.
@@ -54,10 +54,8 @@ export default function LineFeederDashboard() {
   const kundorderPoints = points.filter(p => p.status === 'KUNDORDER');
   const skrapPoints = points.filter(p => p.status === 'SKRAP');
 
-  const getAllowedActions = (point: RedPoint): PointStatus[] => {
-    // Allow all status changes for LineFeeder role
-    return ['LEDIG', 'UPPTAGEN', 'SKRAP', 'KUNDORDER'];
-  };
+  // LineFeeders may make every status change.
+  const allowedActions: PointStatus[] = ['LEDIG', 'UPPTAGEN', 'SKRAP', 'KUNDORDER'];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -184,7 +182,7 @@ export default function LineFeederDashboard() {
           point={selectedPoint}
           onClose={() => setSelectedPoint(null)}
           onUpdateStatus={handleUpdateStatus}
-          allowedActions={getAllowedActions(selectedPoint)}
+          allowedActions={allowedActions}
           canDeleteImages
         />
       )}

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database } from '../types';
+import type { Database } from '../types/database';
 
 // Credentials come from environment variables (.env locally, project settings on Vercel/Netlify).
 // Never hardcode keys here - see .env.example.
