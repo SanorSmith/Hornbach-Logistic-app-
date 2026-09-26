@@ -29,3 +29,8 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Test output
+coverage
+test-results
+playwright-report

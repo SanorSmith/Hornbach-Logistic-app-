@@ -1,0 +1,104 @@
+import { expect, test } from '@playwright/test';
+import { fakeSupabase, logIn } from './fakeSupabase';
+
+// Point cards are headed by their name in the avdelning (e.g. "J3").
+const cardTitles = (page: import('@playwright/test').Page) => page.locator('h3.text-2xl');
+
+test.describe('login', () => {
+  test('wrong password shows an error and stays on the login page', async ({ page }) => {
+    await fakeSupabase(page, { role: 'LINEFEEDER' });
+    await logIn(page, 'fel-lösenord');
+    await expect(page.getByText('Fel e-post eller lösenord')).toBeVisible();
+    await expect(page).toHaveURL(/\/login$/);
+  });
+
+  test('a LineFeeder lands on the LineFeeder dashboard', async ({ page }) => {
+    await fakeSupabase(page, { role: 'LINEFEEDER' });
+    await logIn(page);
+    await expect(page).toHaveURL(/\/linefeeder$/);
+    await expect(cardTitles(page).first()).toBeVisible();
+  });
+
+  test('a temporary password must be changed first', async ({ page }) => {
+    await fakeSupabase(page, { role: 'LINEFEEDER', must_change_password: true });
+    await logIn(page);
+    await expect(page).toHaveURL(/\/change-password$/);
+  });
+
+  test('users of a closed store are refused', async ({ page }) => {
+    await fakeSupabase(page, { role: 'LINEFEEDER', facility_open: false });
+    await logIn(page);
+    await expect(page.getByText(/Butiken är stängd/)).toBeVisible();
+    await expect(page).toHaveURL(/\/login$/);
+  });
+
+  test('the super admin lands on the store panel', async ({ page }) => {
+    await fakeSupabase(page, { role: 'SUPER_ADMIN' });
+    await page.route('http://supabase.test/rest/v1/rpc/facility_overview', (route) =>
+      route.fulfill({ contentType: 'application/json', body: '[]' })
+    );
+    await logIn(page);
+    await expect(page).toHaveURL(/\/superadmin$/);
+    await expect(page.getByRole('heading', { name: 'Butiker' })).toBeVisible();
+  });
+});
+
+test.describe('access by role', () => {
+  test('a LineFeeder cannot open the admin dashboard', async ({ page }) => {
+    await fakeSupabase(page, { role: 'LINEFEEDER' });
+    await logIn(page);
+    await expect(page).toHaveURL(/\/linefeeder$/);
+    await page.goto('/admin');
+    await expect(page).toHaveURL(/\/linefeeder$/);
+  });
+
+  test('an avdelning user cannot open reports', async ({ page }) => {
+    await fakeSupabase(page, { role: 'DEPARTMENT', department_id: 'd-bygg' });
+    await logIn(page);
+    await expect(page).toHaveURL(/\/department$/);
+    await page.goto('/reports');
+    await expect(page).toHaveURL(/\/department$/);
+  });
+});
+
+test.describe('LineFeeder dashboard', () => {
+  test('shows Kundorder first and flags points busy for over 24 h', async ({ page }) => {
+    await fakeSupabase(page, { role: 'LINEFEEDER' });
+    await logIn(page);
+    await expect(cardTitles(page).first()).toHaveText('IB2'); // Kundorder
+    const titles = await cardTitles(page).allTextContents();
+    expect(titles.indexOf('J3')).toBeLessThan(titles.indexOf('J2')); // oldest Upptagen first
+    await expect(page.getByText('Över 24 h')).toHaveCount(1);
+  });
+
+  test('changing a status sends only the status to the database', async ({ page }) => {
+    const db = await fakeSupabase(page, { role: 'LINEFEEDER' });
+    await logIn(page);
+    await cardTitles(page).filter({ hasText: /^IB1$/ }).click(); // Skräp point
+    await page.getByRole('button', { name: /Markera som Ledig/ }).click();
+    await expect(page.getByText('Status uppdaterad!')).toBeVisible();
+    expect(db.statusUpdates).toEqual([{ id: 'p4', body: { status: 'LEDIG' } }]);
+  });
+
+  test('a hardware scanner (Zebra) opens the scanned point', async ({ page }) => {
+    await fakeSupabase(page, { role: 'LINEFEEDER' });
+    await logIn(page);
+    await expect(cardTitles(page).first()).toBeVisible();
+    await page.keyboard.type('RP-006', { delay: 5 });
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('button', { name: /Markera som Upptagen/ })).toBeVisible();
+    await expect(page.getByText('Bygg').first()).toBeVisible();
+  });
+});
+
+test.describe('Avdelning dashboard', () => {
+  test('opens on the user’s own avdelning and cannot mark Upptagen', async ({ page }) => {
+    await fakeSupabase(page, { role: 'DEPARTMENT', department_id: 'd-bygg' });
+    await logIn(page);
+    await expect(page.getByRole('combobox')).toHaveValue('d-bygg');
+    await expect(cardTitles(page)).toHaveText(['IB1', 'IB2', 'IB3']);
+
+    await cardTitles(page).filter({ hasText: /^IB3$/ }).click();
+    await expect(page.getByRole('button', { name: /Markera som Upptagen/ })).toBeDisabled();
+  });
+});
