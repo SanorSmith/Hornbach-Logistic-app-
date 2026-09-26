@@ -121,7 +121,8 @@ describe('PointActionModal', () => {
     getLimitedChangeWait.mockResolvedValue(90);
     render(<PointActionModal point={makePoint({ status: 'SKRAP' })} onClose={() => {}} onUpdateStatus={vi.fn()} allowedActions={[...ALL]} />);
     // From Skräp, both Ledig and Upptagen are limited.
-    const locked = await screen.findAllByRole('button', { name: /vänta 90 s/ });
+    // The countdown ticks every second, so a slow machine may already show 89 s.
+    const locked = await screen.findAllByRole('button', { name: /vänta (90|89|88) s/ });
     expect(locked).toHaveLength(2);
     locked.forEach((button) => expect(button).toBeDisabled());
     // Skräp -> Kundorder is not limited.
