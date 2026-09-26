@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useDialog } from '../hooks/useDialog';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Building2, QrCode, Download, MapPin, Loader2, LayoutGrid } from 'lucide-react';
@@ -17,6 +18,7 @@ import OverdueBadge from '../components/redpoints/OverdueBadge';
 import { formatDuration, isOverdue, sortPointsByName, statusSince, useNow } from '../lib/pointAge';
 import { getStatusLabel } from '../utils/statusColors';
 import { useAuth } from '../hooks/useAuth';
+import { clickableProps } from '../lib/clickable';
 
 export default function DepartmentDashboard() {
   const navigate = useNavigate();
@@ -32,6 +34,12 @@ export default function DepartmentDashboard() {
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [qrPointNumber, setQrPointNumber] = useState<number | null>(null);
   const [qrPointId, setQrPointId] = useState<string | null>(null);
+  const closeQrGenerator = () => {
+    setShowQRGenerator(false);
+    setQrPointNumber(null);
+    setQrPointId(null);
+  };
+  const qrDialogRef = useDialog(showQRGenerator && qrPointNumber !== null, closeQrGenerator);
 
   const ownDepartmentId = user?.department_id;
   useEffect(() => {
@@ -300,10 +308,13 @@ export default function DepartmentDashboard() {
                   <div
                     className={`
                       relative rounded-lg shadow-sm border-2 p-4 cursor-pointer
-                      transition-all hover:shadow-md
+                      transition-all hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500
                       ${overdue ? 'border-red-600 ring-2 ring-red-600/40 bg-red-50' : 'border-gray-200 bg-white'}
                     `}
-                    onClick={() => handlePointClick(point)}
+                    {...clickableProps(
+                      () => handlePointClick(point),
+                      `Punkt ${assignments[point.id]?.trim() || point.point_number}, ${getStatusLabel(point.status)}${overdue ? ', över 24 timmar' : ''}`
+                    )}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -366,16 +377,20 @@ export default function DepartmentDashboard() {
 
       {/* QR Generator Modal */}
       {showQRGenerator && qrPointNumber && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div
+          ref={qrDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`QR-kod för punkt ${qrPointNumber}`}
+          tabIndex={-1}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none"
+        >
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">QR-kod för Punkt {qrPointNumber}</h2>
               <button
-                onClick={() => {
-                  setShowQRGenerator(false);
-                  setQrPointNumber(null);
-                  setQrPointId(null);
-                }}
+                onClick={closeQrGenerator}
+                aria-label="Stäng"
                 className="p-1 hover:bg-gray-100 rounded"
               >
                 ✕

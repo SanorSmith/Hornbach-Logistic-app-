@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useDialog } from '../../hooks/useDialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RedPoint, PointStatus } from '../../types';
 import { X, Package, Trash2, CheckCircle, Camera, Loader2, Clock, AlertCircle } from 'lucide-react';
@@ -36,6 +37,7 @@ export default function PointActionModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const details = usePointDetails(point);
+  const dialogRef = useDialog(true, onClose);
 
   // Anti-cheating limit (see lib/rateLimit.ts): count down while blocked.
   const [waitUntil, setWaitUntil] = useState<number | null>(null);
@@ -209,7 +211,11 @@ export default function PointActionModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+      <div
+        ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1} 
+        aria-label={`Punkt ${details.name ?? point.point_number}`}
+        className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 focus:outline-none"
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}

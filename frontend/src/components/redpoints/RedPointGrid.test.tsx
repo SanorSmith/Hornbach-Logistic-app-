@@ -38,4 +38,14 @@ describe('RedPointGrid', () => {
     await userEvent.click(screen.getByRole('heading', { name: 'KASSA' }));
     expect(onPointClick).toHaveBeenCalledWith(kundorder);
   });
+
+  it('can be used from the keyboard', async () => {
+    const onPointClick = vi.fn();
+    render(<RedPointGrid points={[busyOld]} onPointClick={onPointClick} assignments={names} />);
+    const card = screen.getByRole('button', { name: 'Punkt J3, Upptagen, över 24 timmar' });
+    card.focus();
+    await userEvent.keyboard('{Enter}');
+    await userEvent.keyboard(' ');
+    expect(onPointClick).toHaveBeenCalledTimes(2);
+  });
 });

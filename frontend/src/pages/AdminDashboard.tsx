@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useDialog } from '../hooks/useDialog';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Users, Building2, MapPin, Plus, Edit, Trash2, LayoutGrid, Loader2 } from 'lucide-react';
@@ -37,6 +38,7 @@ export default function AdminDashboard() {
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
+  const editDialogRef = useDialog(editingDepartment !== null, () => setEditingDepartment(null));
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [downloadingQr, setDownloadingQr] = useState(false);
 
@@ -501,12 +503,20 @@ export default function AdminDashboard() {
 
       {/* Edit Department Modal */}
       {editingDepartment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div
+          ref={editDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Redigera avdelning"
+          tabIndex={-1}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none"
+        >
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">Redigera Avdelning</h2>
               <button
                 onClick={() => setEditingDepartment(null)}
+                aria-label="Stäng"
                 className="p-1 hover:bg-gray-100 rounded"
               >
                 ✕

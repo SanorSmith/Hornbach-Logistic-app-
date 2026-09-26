@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDialog } from '../hooks/useDialog';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useRedPoints } from '../hooks/useRedPoints';
@@ -22,6 +23,7 @@ export default function LineFeederDashboard() {
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const selectedPoint = points.find((p) => p.id === selectedPointId) ?? null;
   const [showScanner, setShowScanner] = useState(false);
+  const scannerDialogRef = useDialog(showScanner, () => setShowScanner(false));
   const [filterStatus, setFilterStatus] = useState<PointStatus | 'ALL'>('ALL');
 
   const handlePointClick = (point: RedPoint) => {
@@ -192,7 +194,14 @@ export default function LineFeederDashboard() {
       )}
 
       {showScanner && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div
+          ref={scannerDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Scanna QR-kod"
+          tabIndex={-1}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none"
+        >
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -202,6 +211,7 @@ export default function LineFeederDashboard() {
               <h3 className="text-xl font-bold">Scanna QR-kod</h3>
               <button
                 onClick={() => setShowScanner(false)}
+                aria-label="Stäng"
                 className="text-gray-500 hover:text-gray-700"
               >
                 ✕

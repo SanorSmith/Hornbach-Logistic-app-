@@ -7,6 +7,7 @@ import { User, UserRole, Department } from '../types';
 import toast from 'react-hot-toast';
 import { createAppUser, deleteAppUser } from '../lib/adminUsers';
 import { useAuth } from '../hooks/useAuth';
+import { useDialog } from '../hooks/useDialog';
 import { ROLE_LABELS } from '../lib/access';
 
 // Roles that can be given out on this page. The super admin role is never
@@ -33,6 +34,21 @@ export default function TeamManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const closeCreate = () => {
+    setShowCreateModal(false);
+    resetForm();
+  };
+  const closeEdit = () => {
+    setShowEditModal(false);
+    resetForm();
+  };
+  const closeDelete = () => {
+    setShowDeleteModal(false);
+    setSelectedUser(null);
+  };
+  const createDialogRef = useDialog(showCreateModal, closeCreate);
+  const editDialogRef = useDialog(showEditModal, closeEdit);
+  const deleteDialogRef = useDialog(showDeleteModal && selectedUser !== null, closeDelete);
   const [formData, setFormData] = useState({
     email: '',
     full_name: '',
@@ -478,7 +494,12 @@ export default function TeamManagement() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            ref={createDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Skapa användare"
+            tabIndex={-1}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -549,10 +570,7 @@ export default function TeamManagement() {
               
               <div className="flex justify-end gap-3 mt-6">
                 <button
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    resetForm();
-                  }}
+                  onClick={closeCreate}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                 >
                   Avbryt
@@ -577,7 +595,12 @@ export default function TeamManagement() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            ref={editDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Redigera användare"
+            tabIndex={-1}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -660,10 +683,7 @@ export default function TeamManagement() {
               
               <div className="flex justify-end gap-3 mt-6">
                 <button
-                  onClick={() => {
-                    setShowEditModal(false);
-                    resetForm();
-                  }}
+                  onClick={closeEdit}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                 >
                   Avbryt
@@ -688,7 +708,12 @@ export default function TeamManagement() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            ref={deleteDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Radera användare"
+            tabIndex={-1}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -717,10 +742,7 @@ export default function TeamManagement() {
               
               <div className="flex justify-end gap-3">
                 <button
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setSelectedUser(null);
-                  }}
+                  onClick={closeDelete}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                 >
                   Avbryt
