@@ -16,9 +16,11 @@ interface RedPointCardProps {
   assignments?: Record<string, string>;
   /** Current time (ms), refreshed by the grid so durations stay live. */
   now: number;
+  /** Show who authorized extra pallets under the pallet badge (Monitor). */
+  showPalletAuthorizer?: boolean;
 }
 
-export default function RedPointCard({ point, onClick, assignments, now }: RedPointCardProps) {
+export default function RedPointCard({ point, onClick, assignments, now, showPalletAuthorizer = false }: RedPointCardProps) {
   const statusColor = getStatusColor(point.status);
   const isPriority = point.status === 'KUNDORDER';
   const overdue = isOverdue(point, now);
@@ -63,7 +65,7 @@ export default function RedPointCard({ point, onClick, assignments, now }: RedPo
             </p>
           </div>
         </div>
-        <PalletBadge pointId={point.id} />
+        <PalletBadge pointId={point.id} showAuthorizer={showPalletAuthorizer} />
       </div>
 
       <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">

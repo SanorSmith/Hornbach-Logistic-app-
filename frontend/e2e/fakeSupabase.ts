@@ -75,7 +75,7 @@ function makeExtraPallets(): { pallets: FakePallet[]; allowances: FakeAllowance[
   const placer = { full_name: 'Lars LineFeeder' };
   return {
     allowances: [
-      { id: 'a1', point_id: 'p2', max_pallets: 3, note: 'Kampanj', authorized_by_name: null, granted_by: 'u9', granted_at: hoursAgo(3), ended_at: null, granter: { full_name: 'Jonas Järn' } },
+      { id: 'a1', point_id: 'p2', max_pallets: 3, note: 'Kampanj', authorized_by_name: 'Kalle Bygg', granted_by: 'u9', granted_at: hoursAgo(3), ended_at: null, granter: { full_name: 'Jonas Järn' } },
     ],
     pallets: [
       { id: 'pl1', point_id: 'p2', is_extra: false, image_id: null, note: null, placed_by: 'u8', placed_at: hoursAgo(2), picked_at: null, placer },

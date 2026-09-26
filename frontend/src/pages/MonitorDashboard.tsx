@@ -158,6 +158,7 @@ export default function MonitorDashboard() {
             points={points}
             onPointClick={(point) => setViewedPointId(point.id)} // read-only: shows the latest photos
             assignments={assignments}
+            showPalletAuthorizer
           />
         </div>
 

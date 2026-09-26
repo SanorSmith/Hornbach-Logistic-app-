@@ -7,9 +7,11 @@ interface RedPointGridProps {
   points: RedPoint[];
   onPointClick: (point: RedPoint) => void;
   assignments?: Record<string, string>;
+  /** Show who authorized extra pallets on the cards (Monitor). */
+  showPalletAuthorizer?: boolean;
 }
 
-export default function RedPointGrid({ points, onPointClick, assignments }: RedPointGridProps) {
+export default function RedPointGrid({ points, onPointClick, assignments, showPalletAuthorizer = false }: RedPointGridProps) {
   const now = useNow();
   // Kundorder, Skräp, Upptagen (oldest first), Ledig.
   const sortedPoints = sortPointsForDisplay(points);
@@ -34,6 +36,7 @@ export default function RedPointGrid({ points, onPointClick, assignments }: RedP
           onClick={() => onPointClick(point)}
           assignments={assignments}
           now={now}
+          showPalletAuthorizer={showPalletAuthorizer}
         />
       ))}
     </motion.div>
