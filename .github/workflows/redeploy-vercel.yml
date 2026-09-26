@@ -6,9 +6,18 @@ name: Redeploy Vercel
 on:
   workflow_dispatch:
 
+# The job only calls the deploy hook: it needs no GitHub token permissions.
+permissions: {}
+
+# Pressing "Run" twice queues one redeploy instead of starting two.
+concurrency:
+  group: redeploy-vercel
+  cancel-in-progress: false
+
 jobs:
   redeploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Trigger Vercel deploy hook
         env:
@@ -18,5 +27,5 @@ jobs:
             echo "::error::Repository secret VERCEL_DEPLOY_HOOK is not set"
             exit 1
           fi
-          curl --fail --silent --show-error -X POST "$VERCEL_DEPLOY_HOOK"
+          curl --fail --silent --show-error --max-time 30 --retry 2 -X POST "$VERCEL_DEPLOY_HOOK"
           echo "Vercel redeploy triggered"
