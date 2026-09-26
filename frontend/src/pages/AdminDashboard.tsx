@@ -111,11 +111,10 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleEditUser = (user: User) => {
-    // TODO: Implement edit user functionality
+  // Users are edited on the Team page.
+  const handleEditUser = () => {
     toast('Redigera användare via Teamhantering', { icon: 'ℹ️' });
     navigate('/team');
-    console.log('Edit user:', user);
   };
 
   const handleEditDepartment = (dept: Department) => {
@@ -381,7 +380,7 @@ export default function AdminDashboard() {
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
                         <button 
-                          onClick={() => handleEditUser(user)}
+                          onClick={handleEditUser}
                           className="p-1 hover:bg-gray-100 rounded"
                           title="Redigera användare"
                           aria-label={`Redigera ${user.full_name}`}

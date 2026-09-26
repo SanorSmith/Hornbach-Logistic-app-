@@ -15,6 +15,10 @@
       "source": "/(.*)",
       "headers": [
         {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tgrgqulnmwgcowlrrkfv.supabase.co; connect-src 'self' https://tgrgqulnmwgcowlrrkfv.supabase.co wss://tgrgqulnmwgcowlrrkfv.supabase.co; media-src 'self' blob:; worker-src 'self' blob:; font-src 'self' data:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        },
+        {
           "key": "X-Frame-Options",
           "value": "DENY"
         },
