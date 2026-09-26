@@ -80,6 +80,7 @@ export default function LineFeederDashboard() {
               <ScannerReadyBadge />
               
               <button
+                aria-label="Scanna QR"
                 onClick={() => setShowScanner(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
               >
@@ -88,6 +89,7 @@ export default function LineFeederDashboard() {
               </button>
 
               <button
+                aria-label="Hem"
                 onClick={() => navigate('/')}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
               >

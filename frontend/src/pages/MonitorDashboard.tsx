@@ -48,6 +48,7 @@ export default function MonitorDashboard() {
                 </span>
               </div>
               <button
+                aria-label="Hem"
                 onClick={() => navigate('/')}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition"
               >
