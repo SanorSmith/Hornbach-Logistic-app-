@@ -4,8 +4,10 @@
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = new URL('../dist-csp/', import.meta.url).pathname;
+// fileURLToPath, not URL.pathname: on Windows the latter is "/C:/..." and reads fail.
+const root = fileURLToPath(new URL('../dist-csp/', import.meta.url));
 const vercel = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
 const csp = vercel.headers
   .flatMap((h) => h.headers)
