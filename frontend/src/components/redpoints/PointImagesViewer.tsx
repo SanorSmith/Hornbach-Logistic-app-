@@ -22,7 +22,7 @@ export default function PointImagesViewer({ point, label, onClose }: PointImages
       onClick={onClose}
     >
       <div
-        className="bg-white text-gray-800 rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6"
+        className="bg-white text-gray-800 rounded-xl shadow-xl max-w-3xl w-full max-h-[90dvh] overflow-y-auto p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between mb-5">

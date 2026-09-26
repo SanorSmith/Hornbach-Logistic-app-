@@ -57,7 +57,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   const dialogRef = useDialog(true, onClose);
   return (
     <div ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1} aria-label={title} className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 focus:outline-none">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90dvh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="text-lg font-bold text-gray-900">{title}</h2>
           <button onClick={onClose} className="p-1 text-gray-500 hover:text-gray-800" aria-label="Stäng">
@@ -546,7 +546,7 @@ export default function SuperAdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-100">
+    <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-indigo-100">
       <header className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">

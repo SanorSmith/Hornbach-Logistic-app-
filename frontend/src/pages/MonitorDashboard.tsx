@@ -32,7 +32,7 @@ export default function MonitorDashboard() {
   const skrapPoints = points.filter(p => p.status === 'SKRAP');
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-dvh bg-gray-900 text-white">
       {/* Header */}
       <div className="bg-gray-800 shadow-lg border-b border-gray-700 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
