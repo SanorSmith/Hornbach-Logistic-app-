@@ -126,14 +126,17 @@ export async function deletePointImage(imageId: string): Promise<void> {
   const row = data as { storage_path: string } | null;
   if (!row) return; // already gone
 
-  const { error: storageError } = await supabase.storage.from(BUCKET).remove([row.storage_path]);
-  if (storageError) throw storageError;
-
+  // The row first: if the database refuses, the file is still there (the other
+  // way round left photos whose file was gone).
   const { error: deleteError } = await supabase
     .from('point_images' as never)
     .delete()
     .eq('id', imageId);
   if (deleteError) throw deleteError;
+
+  const { error: storageError } = await supabase.storage.from(BUCKET).remove([row.storage_path]);
+  // The photo is already gone from the app; a file left behind only takes space.
+  if (storageError) console.error('Error removing photo file:', storageError);
 }
 
 /** Signed display URLs for specific photos (e.g. the pallets on a point), by id. */

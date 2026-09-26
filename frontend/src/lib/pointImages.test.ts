@@ -59,6 +59,13 @@ describe('deletePointImage', () => {
     expect(mock.calls).toContainEqual({ table: 'point_images', method: 'delete', args: [] });
   });
 
+  it('keeps the file when the database refuses to delete the photo', async () => {
+    mock.respond('point_images', { data: { storage_path: 'p1/9.jpg' } }); // the lookup
+    mock.respond('point_images', { error: { message: 'The pallet has already been picked' } }); // the delete
+    await expect(deletePointImage('img9')).rejects.toMatchObject({ message: 'The pallet has already been picked' });
+    expect(mock.storageRemove).not.toHaveBeenCalled();
+  });
+
   it('is a no-op when the photo is already gone', async () => {
     mock.respond('point_images', { data: null });
     await deletePointImage('missing');
