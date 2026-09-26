@@ -241,7 +241,6 @@ export default function LineFeederDashboard() {
           // LineFeeders place and pick pallets; the privilege is the avdelning's.
           palletAccess={{
             canPlace: true,
-            canPick: true,
             // Only the LineFeeder handles extra pallets: grants them (naming who
             // approved them), raises or lowers the maximum, and ends them.
             canGrant: true,

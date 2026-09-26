@@ -384,7 +384,6 @@ export default function DepartmentDashboard() {
           disabledActions={['UPPTAGEN']}
           palletAccess={{
             canPlace: isLeader,
-            canPick: true,
             // The privilege is the LineFeeder's to handle: an avdelning user can
             // see it but not grant, change or end it.
             canGrant: isLeader,

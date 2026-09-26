@@ -69,18 +69,6 @@ export async function placePallet(pointId: string, photo: File, note: string): P
   }
 }
 
-/** Marks one pallet as picked up (who and when are set by the database). */
-export async function pickPallet(palletId: string): Promise<void> {
-  const { data, error } = await supabase
-    .from('point_pallets' as never)
-    .update({ picked_at: new Date().toISOString() } as never)
-    .eq('id', palletId)
-    .select('id');
-  if (error) throw error;
-  // Row level security hides a refused update: nothing comes back.
-  if (!data || (data as unknown[]).length === 0) throw new Error('not allowed');
-}
-
 /**
  * Lets the point hold up to `maxPallets` pallets. Registered in the signed-in
  * user's name; `authorizedBy` is who approved it (required for a LineFeeder).

@@ -188,6 +188,11 @@ export async function fakeSupabase(page: Page, account: FakeUser): Promise<FakeS
         state.statusUpdates.push({ id, body });
         const point = state.points.find((p) => p.id === id);
         if (point && typeof body.status === 'string') {
+          // Leaving Upptagen picks every pallet on the point (sync_pallets_with_status).
+          if (point.status === 'UPPTAGEN' && body.status !== 'UPPTAGEN') {
+            state.pallets.filter((p) => p.point_id === id && !p.picked_at).forEach((p) => (p.picked_at = new Date().toISOString()));
+            state.allowances.filter((a) => a.point_id === id && !a.ended_at).forEach((a) => (a.ended_at = new Date().toISOString()));
+          }
           point.status = body.status as Status;
           point.status_changed_at = new Date().toISOString();
         }
