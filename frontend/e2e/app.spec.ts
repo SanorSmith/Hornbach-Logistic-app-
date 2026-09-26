@@ -87,7 +87,26 @@ test.describe('LineFeeder dashboard', () => {
     await page.keyboard.type('RP-006', { delay: 5 });
     await page.keyboard.press('Enter');
     await expect(page.getByRole('button', { name: /Markera som Upptagen/ })).toBeVisible();
-    await expect(page.getByText('Bygg').first()).toBeVisible();
+    // The opened point shows its avdelning (not the "Bygg" option in the filter).
+    await expect(page.getByRole('dialog').getByText('Bygg').first()).toBeVisible();
+  });
+
+  test('narrows the points to one avdelning, together with the status filter', async ({ page }) => {
+    await fakeSupabase(page, { role: 'LINEFEEDER' });
+    await logIn(page);
+    await expect(cardTitles(page)).toHaveCount(6);
+
+    await page.getByRole('combobox', { name: 'Avdelning' }).selectOption({ label: 'Bygg' });
+    await expect(cardTitles(page)).toHaveText(['IB2', 'IB1', 'IB3']); // Kundorder, Skräp, Ledig
+
+    await page.getByRole('button', { name: 'LEDIG', exact: true }).click();
+    await expect(cardTitles(page)).toHaveText(['IB3']);
+
+    await page.getByRole('combobox', { name: 'Avdelning' }).selectOption({ label: 'Järn' });
+    await expect(cardTitles(page)).toHaveText(['J1']);
+
+    await page.getByRole('button', { name: 'KUNDORDER', exact: true }).click();
+    await expect(page.getByText('Inga punkter matchar filtret.')).toBeVisible();
   });
 });
 

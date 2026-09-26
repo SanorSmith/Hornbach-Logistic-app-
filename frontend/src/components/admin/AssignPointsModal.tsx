@@ -204,8 +204,9 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
 
           <div className="flex flex-col md:flex-row md:items-end gap-4">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Avdelning</label>
+              <label htmlFor="assign-points-department" className="block text-sm font-medium text-gray-700 mb-1.5">Avdelning</label>
               <select
+                id="assign-points-department"
                 value={selectedDepartment}
                 onChange={(e) => setSelectedDepartment(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -231,6 +232,7 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
                     value={bulkFrom}
                     onChange={(e) => setBulkFrom(e.target.value)}
                     placeholder="Från"
+                    aria-label="Från nummer"
                     className="min-w-0 flex-1 md:w-24 md:flex-none px-3 py-2.5 border border-gray-300 rounded-lg"
                   />
                   <span className="text-gray-400">–</span>
@@ -240,6 +242,7 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
                     value={bulkTo}
                     onChange={(e) => setBulkTo(e.target.value)}
                     placeholder="Till"
+                    aria-label="Till nummer"
                     className="min-w-0 flex-1 md:w-24 md:flex-none px-3 py-2.5 border border-gray-300 rounded-lg"
                   />
                   <button
@@ -288,6 +291,7 @@ export default function AssignPointsModal({ isOpen, onClose, onSuccess, departme
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Sök punkt…"
+                  aria-label="Sök punkt"
                   className="w-full sm:w-44 pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
               </div>

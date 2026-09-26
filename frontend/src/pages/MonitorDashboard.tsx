@@ -7,7 +7,7 @@ import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
 import RedPointGrid from '../components/redpoints/RedPointGrid';
 import PointImagesViewer from '../components/redpoints/PointImagesViewer';
-import { PointStatus, RedPoint } from '../types';
+import { PointStatus } from '../types';
 
 export default function MonitorDashboard() {
   const navigate = useNavigate();
@@ -16,7 +16,10 @@ export default function MonitorDashboard() {
   // When the data last changed, not a ticking clock: re-rendering the whole
   // grid every second wore out low-power screens left on all day.
   const lastSyncedAt = useRedPointsStore((state) => state.lastSyncedAt);
-  const [viewedPoint, setViewedPoint] = useState<RedPoint | null>(null);
+  // Keep only the id: the point itself always comes from the live list, so an
+  // open dialog shows status changes made on other devices.
+  const [viewedPointId, setViewedPointId] = useState<string | null>(null);
+  const viewedPoint = points.find((p) => p.id === viewedPointId) ?? null;
 
   const statusCounts = points.reduce((acc, point) => {
     acc[point.status] = (acc[point.status] || 0) + 1;
@@ -151,7 +154,7 @@ export default function MonitorDashboard() {
           <p className="text-sm text-gray-400 mb-4">Klicka på en punkt för att se de senaste bilderna.</p>
           <RedPointGrid
             points={points}
-            onPointClick={setViewedPoint} // read-only: shows the latest photos
+            onPointClick={(point) => setViewedPointId(point.id)} // read-only: shows the latest photos
             assignments={assignments}
           />
         </div>
@@ -160,7 +163,7 @@ export default function MonitorDashboard() {
           <PointImagesViewer
             point={viewedPoint}
             label={assignments[viewedPoint.id] || String(viewedPoint.point_number)}
-            onClose={() => setViewedPoint(null)}
+            onClose={() => setViewedPointId(null)}
           />
         )}
 
