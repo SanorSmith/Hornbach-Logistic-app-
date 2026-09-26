@@ -190,7 +190,7 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-dvh bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
@@ -266,7 +266,8 @@ export default function ReportsPage() {
             ))}
           </select>
 
-          <div className="grid grid-cols-3 gap-2 lg:flex">
+          {/* One row only on wide screens: at tablet width (1024 px) the row overflowed. */}
+          <div className="grid grid-cols-3 gap-2 xl:flex">
             <button
               onClick={handlePrint}
               disabled={!report || loading || pdfBusy !== null}

@@ -290,7 +290,7 @@ export default function PointActionModal({
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.9 }}
-          className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto"
+          className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto"
         >
           <div className="flex items-start justify-between mb-4">
             <div>

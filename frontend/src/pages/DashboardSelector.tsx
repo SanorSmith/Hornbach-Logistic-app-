@@ -73,7 +73,7 @@ export default function DashboardSelector() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-4xl w-full">
         {user && (
           <div className="flex items-center justify-end gap-3 mb-6 text-sm text-gray-700">
