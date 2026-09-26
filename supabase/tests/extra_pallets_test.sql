@@ -1,8 +1,9 @@
 -- Tests for migrations/20260926130000_extra_pallets.sql,
 -- 20260926150000_extra_pallets_rules.sql and
 -- 20260926170000_extra_pallets_authorized_by.sql,
--- 20260926190000_extra_pallets_linefeeder_only.sql and
--- 20260926210000_extra_pallets_name_required.sql.
+-- 20260926190000_extra_pallets_linefeeder_only.sql,
+-- 20260926210000_extra_pallets_name_required.sql and
+-- 20260926230000_pallet_photo_delete.sql.
 --
 -- Run the migrations not yet applied and then this file as ONE batch (one transaction), e.g.
 -- through the Supabase SQL editor or the MCP execute_sql tool. The script
@@ -64,6 +65,7 @@ declare
   v_third uuid;
   v_allow uuid;
   v_allow2 uuid;
+  v_img uuid;
   v_n integer;
   v_report jsonb;
   v_from timestamptz := now() - interval '1 hour';
@@ -204,6 +206,19 @@ begin
   perform pg_temp.act_as(null);
   perform pg_temp.ok((select status from public.red_points where id = p1) = 'LEDIG', 'last pallet picked -> LEDIG');
   perform pg_temp.ok(not (select picked_as_extra from public.point_pallets where id = v_first), 'the last pick is not extra');
+
+  -- 10a. Deleting a pallet's photo works and only clears the link
+  --      (20260926230000_pallet_photo_delete.sql); nothing else can change that way.
+  perform pg_temp.act_as(lf);
+  insert into public.point_images (point_id, storage_path) values (p1, 'zztest/p1-photo.jpg') returning id into v_img;
+  perform pg_temp.act_as(null);
+  update public.point_pallets set image_id = v_img where id = v_first; -- a picked pallet
+  perform pg_temp.act_as(lf);
+  perform pg_temp.expect_error(format('update public.point_pallets set image_id = null, note = %L where id = %L', 'x', v_first), 'already been picked');
+  delete from public.point_images where id = v_img;
+  perform pg_temp.act_as(null);
+  perform pg_temp.ok(not exists (select 1 from public.point_images where id = v_img), 'the photo was deleted');
+  perform pg_temp.ok((select image_id from public.point_pallets where id = v_first) is null, 'the pallet no longer links to it');
 
   -- 10b. A LineFeeder registers a privilege for the avdelning, naming who
   --      authorized it, and may end it early once at most one pallet is left.
