@@ -15,6 +15,8 @@ import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { findPointByScan } from '../lib/scanLookup';
 import ScannerReadyBadge from '../components/redpoints/ScannerReadyBadge';
 import OverdueBadge from '../components/redpoints/OverdueBadge';
+import PalletBadge from '../components/redpoints/PalletBadge';
+import { usePallets } from '../hooks/usePallets';
 import { formatDuration, isOverdue, sortPointsByName, statusSince, useNow } from '../lib/pointAge';
 import { getStatusLabel } from '../utils/statusColors';
 import { useAuth } from '../hooks/useAuth';
@@ -27,6 +29,8 @@ export default function DepartmentDashboard() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [departments, setDepartments] = useState<{ id: string; name: string; location: string }[]>([]);
   const { assignments, assignedDepartments } = useDepartmentAssignments();
+  usePallets();
+  const isLeader = user?.role === 'ADMIN' || user?.role === 'TEAM_LEADER';
   // Keep only the id: the point itself always comes from the live list, so an
   // open dialog shows changes made on other devices.
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
@@ -329,6 +333,7 @@ export default function DepartmentDashboard() {
                             {assignments[point.id]?.trim() || `#${point.point_number}`}
                           </h3>
                           <p className="text-xs text-gray-500">{getStatusLabel(point.status)}</p>
+                          <PalletBadge pointId={point.id} />
                         </div>
                       </div>
                     </div>
@@ -377,6 +382,16 @@ export default function DepartmentDashboard() {
           onUpdateStatus={handleUpdateStatus}
           allowedActions={['LEDIG', 'UPPTAGEN', 'SKRAP', 'KUNDORDER']}
           disabledActions={['UPPTAGEN']}
+          palletAccess={{
+            canPlace: isLeader,
+            canPick: true,
+            // An avdelning manages extra pallets on its own points only.
+            canManage:
+              isLeader ||
+              (user?.role === 'DEPARTMENT' &&
+                !!user.department_id &&
+                assignedDepartments[selectedPoint.id] === user.department_id),
+          }}
         />
       )}
 

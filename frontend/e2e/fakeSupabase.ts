@@ -67,17 +67,61 @@ export interface FakeUser {
   is_active?: boolean;
   facility_open?: boolean;
   password?: string;
+  /** J2 (d-jarn) may hold 3 pallets and has 2 on it. */
+  extraPallets?: boolean;
+}
+
+function makeExtraPallets(): { pallets: FakePallet[]; allowances: FakeAllowance[] } {
+  const placer = { full_name: 'Lars LineFeeder' };
+  return {
+    allowances: [
+      { id: 'a1', point_id: 'p2', max_pallets: 3, note: 'Kampanj', granted_by: 'u9', granted_at: hoursAgo(3), ended_at: null, granter: { full_name: 'Jonas Järn' } },
+    ],
+    pallets: [
+      { id: 'pl1', point_id: 'p2', is_extra: false, image_id: null, note: null, placed_by: 'u8', placed_at: hoursAgo(2), picked_at: null, placer },
+      { id: 'pl2', point_id: 'p2', is_extra: true, image_id: null, note: 'Grillkol', placed_by: 'u8', placed_at: hoursAgo(1), picked_at: null, placer },
+    ],
+  };
 }
 
 export interface FakeSupabase {
   /** PATCH bodies sent to red_points, in order. */
   statusUpdates: { id: string; body: Record<string, unknown> }[];
   points: ReturnType<typeof makePoints>['points'];
+  /** Extra pallets: pallets on points and the privileges (see 20260926130000_extra_pallets.sql). */
+  pallets: FakePallet[];
+  allowances: FakeAllowance[];
+  /** Bodies POSTed / PATCHed to point_allowances and point_pallets, in order. */
+  palletWrites: { table: string; method: string; body: Record<string, unknown> }[];
+}
+
+interface FakePallet {
+  id: string;
+  point_id: string;
+  is_extra: boolean;
+  image_id: string | null;
+  note: string | null;
+  placed_by: string;
+  placed_at: string;
+  picked_at: string | null;
+  placer: { full_name: string };
+}
+
+interface FakeAllowance {
+  id: string;
+  point_id: string;
+  max_pallets: number;
+  note: string | null;
+  granted_by: string;
+  granted_at: string;
+  ended_at: string | null;
+  granter: { full_name: string };
 }
 
 export async function fakeSupabase(page: Page, account: FakeUser): Promise<FakeSupabase> {
   const { points, assignments } = makePoints();
-  const state: FakeSupabase = { statusUpdates: [], points };
+  const extra = account.extraPallets ? makeExtraPallets() : { pallets: [], allowances: [] };
+  const state: FakeSupabase = { statusUpdates: [], points, ...extra, palletWrites: [] };
   const email = 'anna@hornbach.se';
   const password = account.password ?? 'rätt-lösenord';
   const authUser = { id: 'u1', aud: 'authenticated', role: 'authenticated', email, app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' };
@@ -161,6 +205,46 @@ export async function fakeSupabase(page: Page, account: FakeUser): Promise<FakeS
     if (table === 'facilities') return rows(route, [FACILITY]);
     if (table === 'point_images' || table === 'notifications' || table === 'status_history') return rows(route, []);
     if (table === 'rpc/limited_change_wait_seconds') return json(route, 0);
+
+    // Extra pallets. The rules themselves are tested against the database
+    // (supabase/tests/extra_pallets_test.sql); this only stores what the app sends.
+    if (table === 'point_allowances') {
+      if (method === 'POST') {
+        const body = request.postDataJSON() as Record<string, unknown>;
+        state.palletWrites.push({ table, method, body });
+        state.allowances.unshift({
+          id: `a${state.allowances.length + 2}`,
+          point_id: String(body.point_id),
+          max_pallets: Number(body.max_pallets),
+          note: (body.note as string | null) ?? null,
+          granted_by: 'u1',
+          granted_at: new Date().toISOString(),
+          ended_at: null,
+          granter: { full_name: profile.full_name },
+        });
+        return route.fulfill({ status: 201 });
+      }
+      if (method === 'PATCH') {
+        state.palletWrites.push({ table, method, body: request.postDataJSON() as Record<string, unknown> });
+        return route.fulfill({ status: 204 });
+      }
+      return rows(route, state.allowances.filter((a) => !a.ended_at));
+    }
+    if (table === 'point_pallets') {
+      if (method === 'PATCH') {
+        const id = (url.searchParams.get('id') ?? '').replace('eq.', '');
+        state.palletWrites.push({ table, method, body: { id, ...(request.postDataJSON() as Record<string, unknown>) } });
+        const pallet = state.pallets.find((p) => p.id === id);
+        if (pallet) pallet.picked_at = new Date().toISOString();
+        return json(route, pallet ? [{ id }] : []);
+      }
+      if (method === 'POST') {
+        state.palletWrites.push({ table, method, body: request.postDataJSON() as Record<string, unknown> });
+        return route.fulfill({ status: 201 });
+      }
+      const pointId = url.searchParams.get('point_id');
+      return rows(route, state.pallets.filter((p) => !p.picked_at && (!pointId || `eq.${p.point_id}` === pointId)));
+    }
 
     return json(route, { message: `fakeSupabase: unhandled ${method} ${path}` }, 404);
   });

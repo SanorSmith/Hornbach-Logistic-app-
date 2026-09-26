@@ -77,10 +77,24 @@ export async function uploadPointImage(pointId: string, file: File, note?: strin
   return (data as { id: string }).id;
 }
 
-/** Keeps only the newest MAX_IMAGES_PER_POINT photos for a point. */
+/** Ids of photos belonging to pallets still on the point (kept by pruning). */
+async function openPalletImageIds(pointId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('point_pallets' as never)
+    .select('image_id')
+    .eq('point_id', pointId)
+    .is('picked_at', null);
+  if (error) throw error;
+  return new Set(((data ?? []) as { image_id: string | null }[]).flatMap((r) => (r.image_id ? [r.image_id] : [])));
+}
+
+/**
+ * Keeps only the newest MAX_IMAGES_PER_POINT photos for a point, plus the
+ * photos of pallets that are still on it.
+ */
 export async function pruneOldImages(pointId: string): Promise<void> {
-  const rows = await listRows(pointId);
-  const extra = rows.slice(MAX_IMAGES_PER_POINT);
+  const [rows, keep] = await Promise.all([listRows(pointId), openPalletImageIds(pointId)]);
+  const extra = rows.slice(MAX_IMAGES_PER_POINT).filter((r) => !keep.has(r.id));
   if (extra.length === 0) return;
   await supabase.storage.from(BUCKET).remove(extra.map((r) => r.storage_path));
   await supabase
@@ -109,6 +123,24 @@ export async function deletePointImage(imageId: string): Promise<void> {
     .delete()
     .eq('id', imageId);
   if (deleteError) throw deleteError;
+}
+
+/** Signed display URLs for specific photos (e.g. the pallets on a point), by id. */
+export async function getImageUrls(imageIds: string[]): Promise<Record<string, string>> {
+  if (imageIds.length === 0) return {};
+  const { data: rows, error } = await supabase
+    .from('point_images' as never)
+    .select('id, storage_path')
+    .in('id', imageIds);
+  if (error) throw error;
+  const list = (rows ?? []) as unknown as { id: string; storage_path: string }[];
+  if (list.length === 0) return {};
+
+  const { data, error: urlError } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrls(list.map((r) => r.storage_path), 60 * 60);
+  if (urlError) throw urlError;
+  return Object.fromEntries(list.map((row, i) => [row.id, data?.[i]?.signedUrl ?? '']));
 }
 
 /** Newest photos for a point, with short-lived signed URLs for display. */

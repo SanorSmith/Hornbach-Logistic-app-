@@ -15,7 +15,7 @@ export function createSupabaseMock() {
 
   const builder = (table: string) => {
     const b: Record<string, unknown> = {};
-    for (const method of ['select', 'insert', 'update', 'delete', 'eq', 'gte', 'in', 'order', 'limit']) {
+    for (const method of ['select', 'insert', 'update', 'delete', 'eq', 'gte', 'in', 'is', 'order', 'limit']) {
       b[method] = (...args: unknown[]) => {
         calls.push({ table, method, args });
         return b;

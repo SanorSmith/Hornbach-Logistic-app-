@@ -59,6 +59,35 @@ export interface RedPoint {
   created_at: string;
 }
 
+/**
+ * One pallet on a red point. Open while picked_at is null.
+ * See supabase/migrations/20260926130000_extra_pallets.sql.
+ */
+export interface PointPallet {
+  id: string;
+  point_id: string;
+  /** Placed while another pallet was already on the point (under a privilege). */
+  is_extra: boolean;
+  image_id: string | null;
+  note: string | null;
+  placed_by: string | null;
+  placed_at: string;
+  picked_at: string | null;
+  placer?: { full_name: string } | null;
+}
+
+/** An avdelning's privilege to put more than one pallet on a point. */
+export interface PointAllowance {
+  id: string;
+  point_id: string;
+  max_pallets: number;
+  note: string | null;
+  granted_by: string | null;
+  granted_at: string;
+  ended_at: string | null;
+  granter?: { full_name: string } | null;
+}
+
 export interface Notification {
   id: string;
   user_id: string;

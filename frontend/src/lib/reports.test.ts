@@ -9,6 +9,8 @@ const zero: Counts = {
   skrap_removed: 0,
   kundorder_reported: 0,
   kundorder_picked: 0,
+  extra_pallets_placed: 0,
+  allowances_granted: 0,
 };
 
 describe('getPeriod', () => {

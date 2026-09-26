@@ -26,6 +26,9 @@ export const METRICS = [
   { key: 'skrap_removed', label: 'Skräp borttaget', short: 'Skräp bort' },
   { key: 'kundorder_reported', label: 'Kundorder', short: 'Kundorder' },
   { key: 'kundorder_picked', label: 'Kundorder hämtade', short: 'KO hämtade' },
+  // Extra pallets (already counted in pallets placed) and the privileges granted.
+  { key: 'extra_pallets_placed', label: 'Extrapallar', short: 'Extrapall' },
+  { key: 'allowances_granted', label: 'Extrapall-tillstånd', short: 'Tillstånd' },
 ] as const;
 
 export type MetricKey = (typeof METRICS)[number]['key'];
@@ -83,7 +86,14 @@ const emptyCounts = (): Counts => ({
   skrap_removed: 0,
   kundorder_reported: 0,
   kundorder_picked: 0,
+  extra_pallets_placed: 0,
+  allowances_granted: 0,
 });
+
+/** Fills in metrics the database did not send (e.g. before a migration) with 0. */
+function withAllCounts<T extends Partial<Counts>>(row: T): T & Counts {
+  return { ...emptyCounts(), ...row } as T & Counts;
+}
 
 /** Every day (or month) of the period, with zeros where nothing happened. */
 export function fillSeries(period: Period, series: ReportData['series']) {
@@ -108,7 +118,14 @@ export async function fetchReport(period: Period, departmentId: string | null): 
     p_department_id: departmentId,
   } as never);
   if (error) throw error;
-  return data as unknown as ReportData;
+  const report = data as unknown as ReportData;
+  return {
+    totals: withAllCounts(report.totals),
+    series: report.series.map(withAllCounts),
+    by_department: report.by_department.map(withAllCounts),
+    by_user: report.by_user.map(withAllCounts),
+    by_point: report.by_point.map(withAllCounts),
+  };
 }
 
 /** Downloads rows as a CSV that opens correctly in Swedish Excel (; separator, UTF-8 BOM). */
