@@ -230,6 +230,7 @@ export default function PointActionModal({
             </div>
             <button
               onClick={onClose}
+              aria-label="Stäng"
               className="text-gray-400 hover:text-gray-600 transition"
             >
               <X size={24} />
