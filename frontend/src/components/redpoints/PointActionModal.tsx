@@ -5,9 +5,12 @@ import { RedPoint, PointStatus } from '../../types';
 import { X, Package, Trash2, CheckCircle, Camera, Loader2, Clock, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { deletePointImage, pruneOldImages, uploadPointImage } from '../../lib/pointImages';
-import { getLimitedChangeWait, isLimitedChange, RATE_LIMIT_MESSAGE } from '../../lib/rateLimit';
+import { getLimitedChangeWait, isLimitedChange, RATE_LIMIT_MESSAGE, rateLimitSeconds } from '../../lib/rateLimit';
 import PointImageGallery from './PointImageGallery';
-import PointPalletsPanel from './PointPalletsPanel';
+import PointPalletsPanel, { PalletAccess } from './PointPalletsPanel';
+import { usePalletsStore } from '../../store/palletsStore';
+import { loadPallets } from '../../hooks/usePallets';
+import { palletErrorMessage, palletSummary, placePallet } from '../../lib/pallets';
 import { usePointDetails } from '../../hooks/usePointDetails';
 import { getStatusLabel } from '../../utils/statusColors';
 import StatusCircle from './StatusCircle';
@@ -23,7 +26,7 @@ interface PointActionModalProps {
   /** Allow deleting photos from the gallery (LineFeeder only). */
   canDeleteImages?: boolean;
   /** What the user may do with the point's pallets and extra pallet privilege. */
-  palletAccess?: { canPlace?: boolean; canPick?: boolean; canManage?: boolean };
+  palletAccess?: PalletAccess;
 }
 
 export default function PointActionModal({
@@ -42,6 +45,20 @@ export default function PointActionModal({
   const cameraInput = useRef<HTMLInputElement>(null);
   const details = usePointDetails(point);
   const dialogRef = useDialog(true, onClose);
+
+  // On a point that is already Upptagen, "Markera som Upptagen" registers the
+  // next pallet (with its own photo), up to what the avdelning allowed.
+  const pallets = usePalletsStore((state) => state.pallets);
+  const allowances = usePalletsStore((state) => state.allowances);
+  const { open: openPallets, allowance, max: maxPallets } = palletSummary(pallets, allowances, point.id);
+  const addsPallet = point.status === 'UPPTAGEN';
+  const pointFull = addsPallet && (!palletAccess?.canPlace || openPallets.length >= maxPallets);
+  const nextPallet = addsPallet ? openPallets.length + 1 : 1;
+  const upptagenLabel = pointFull
+    ? `${allowance ? 'Fullt' : 'Upptagen'} (${openPallets.length}/${maxPallets})`
+    : allowance
+      ? `Markera som Upptagen (${nextPallet}/${maxPallets})`
+      : 'Markera som Upptagen';
 
   // Anti-cheating limit (see lib/rateLimit.ts): count down while blocked.
   const [waitUntil, setWaitUntil] = useState<number | null>(null);
@@ -65,7 +82,9 @@ export default function PointActionModal({
     return () => clearInterval(timer);
   }, [waitUntil]);
 
-  const isRateLimited = (status: PointStatus) => remaining > 0 && isLimitedChange(point.status, status);
+  // An extra pallet counts toward the same limit as a change to Upptagen.
+  const isRateLimited = (status: PointStatus) =>
+    remaining > 0 && (isLimitedChange(point.status, status) || (addsPallet && status === 'UPPTAGEN'));
 
   const showRateLimit = (seconds: number) =>
     toast.error(`${RATE_LIMIT_MESSAGE} Försök igen om ${seconds} s.`, { duration: 6000 });
@@ -103,10 +122,47 @@ export default function PointActionModal({
     onClose();
   };
 
+  // Another pallet on a point that is already Upptagen: its photo and the note
+  // are saved with that pallet only, apart from the point's ordinary photos.
+  const handleNextPallet = async (file: File) => {
+    setErrorMessage(null);
+    setIsUpdating(true);
+    const wait = await getLimitedChangeWait();
+    if (wait > 0) {
+      startWait(wait);
+      setErrorMessage(`${RATE_LIMIT_MESSAGE} Knappen låses upp när tiden har gått.`);
+      setIsUpdating(false);
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      await placePallet(point.id, file, notes);
+    } catch (error) {
+      console.error('Error registering pallet:', error);
+      const seconds = rateLimitSeconds(error);
+      if (seconds !== null) startWait(seconds);
+      setErrorMessage(palletErrorMessage(error));
+      setIsUploading(false);
+      setIsUpdating(false);
+      return;
+    }
+    setIsUploading(false);
+    await loadPallets();
+    toast.success(`Pall ${nextPallet}/${maxPallets} registrerad`);
+    setNotes('');
+    setIsUpdating(false);
+    onClose();
+  };
+
   const handlePhotoTaken = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = ''; // allow taking the same photo again
     if (!file) return; // camera cancelled - status is not changed
+    if (addsPallet) {
+      await handleNextPallet(file);
+      return;
+    }
 
     setErrorMessage(null);
     setIsUpdating(true);
@@ -159,7 +215,7 @@ export default function PointActionModal({
       },
       UPPTAGEN: {
         icon: Camera,
-        label: 'Markera som Upptagen',
+        label: upptagenLabel,
         color: 'bg-upptagen hover:bg-upptagen-dark',
       },
       SKRAP: {
@@ -176,7 +232,8 @@ export default function PointActionModal({
 
     const config = configs[status];
     const Icon = config.icon;
-    const isDisabled = disabledActions.includes(status);
+    // No more pallets than the avdelning allowed.
+    const isDisabled = disabledActions.includes(status) || (status === 'UPPTAGEN' && pointFull);
     const limited = isRateLimited(status);
 
     return (
@@ -184,7 +241,15 @@ export default function PointActionModal({
         key={status}
         onClick={() => handleUpdateStatus(status)}
         disabled={isUpdating || isDisabled || limited}
-        title={isDisabled ? 'Inte tillgänglig på den här sidan' : limited ? RATE_LIMIT_MESSAGE : undefined}
+        title={
+          disabledActions.includes(status)
+            ? 'Inte tillgänglig på den här sidan'
+            : isDisabled
+              ? 'Punkten har så många pallar som avdelningen tillåter'
+              : limited
+                ? RATE_LIMIT_MESSAGE
+                : undefined
+        }
         className={`
           w-full py-3 px-4 rounded-lg text-white font-semibold
           flex items-center justify-center gap-2

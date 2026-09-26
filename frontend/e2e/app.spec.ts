@@ -4,6 +4,12 @@ import { fakeSupabase, logIn } from './fakeSupabase';
 // Point cards are headed by their name in the avdelning (e.g. "J3").
 const cardTitles = (page: import('@playwright/test').Page) => page.locator('h3.text-2xl');
 
+// A 1x1 PNG: a real image, so the app can compress it like a camera photo.
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64'
+);
+
 test.describe('login', () => {
   test('wrong password shows an error and stays on the login page', async ({ page }) => {
     await fakeSupabase(page, { role: 'LINEFEEDER' });
@@ -183,7 +189,41 @@ test.describe('Extra pallets', () => {
     expect(db.palletWrites).toContainEqual(
       expect.objectContaining({ table: 'point_pallets', method: 'PATCH', body: expect.objectContaining({ id: 'pl2' }) })
     );
-    // Room for another extra pallet again.
-    await expect(dialog.getByRole('button', { name: /Lägg till extrapall/ })).toBeVisible();
+    // Room for another pallet again: Upptagen counts up.
+    await expect(dialog.getByRole('button', { name: 'Markera som Upptagen (2/3)' })).toBeEnabled();
+  });
+
+  test('Markera som Upptagen registers each extra pallet with its photo, up to the allowed number', async ({ page }) => {
+    const db = await fakeSupabase(page, { role: 'LINEFEEDER', extraPallets: true });
+    await logIn(page);
+    await cardTitles(page).filter({ hasText: /^J2$/ }).click();
+    const dialog = page.getByRole('dialog');
+
+    await dialog.getByPlaceholder('Lägg till noteringar...').fill('Tredje pallen');
+    await dialog.locator('input[type="file"]').setInputFiles({ name: 'pall.png', mimeType: 'image/png', buffer: PNG });
+    await expect(page.getByText('Pall 3/3 registrerad')).toBeVisible();
+    expect(db.palletWrites).toContainEqual(
+      expect.objectContaining({
+        table: 'point_pallets',
+        method: 'POST',
+        body: expect.objectContaining({ point_id: 'p2', note: 'Tredje pallen', image_id: expect.any(String) }),
+      })
+    );
+    // Only status 'UPPTAGEN' existed already: no status change was sent.
+    expect(db.statusUpdates).toEqual([]);
+
+    await expect(page.getByText('3/3 pallar')).toBeVisible();
+    await cardTitles(page).filter({ hasText: /^J2$/ }).click();
+    await expect(page.getByRole('dialog').getByRole('listitem')).toHaveCount(3);
+    await expect(page.getByRole('button', { name: 'Fullt (3/3)' })).toBeDisabled();
+  });
+
+  test('the avdelning cannot lower or end a privilege it gave', async ({ page }) => {
+    await fakeSupabase(page, { role: 'DEPARTMENT', department_id: 'd-jarn', extraPallets: true });
+    await logIn(page);
+    await cardTitles(page).filter({ hasText: /^J2$/ }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText(/kan bara minskas eller avslutas av LineFeeder eller teamledare/)).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Avsluta tillstånd' })).toHaveCount(0);
   });
 });

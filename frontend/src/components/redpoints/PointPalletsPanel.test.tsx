@@ -53,10 +53,7 @@ beforeEach(() => {
   mock.reset();
   toast.success.mockReset();
   toast.error.mockReset();
-  Object.values(images).forEach((fn) => fn.mockReset());
-  images.uploadPointImage.mockResolvedValue('img-new');
-  images.pruneOldImages.mockResolvedValue(undefined);
-  images.getImageUrls.mockResolvedValue({});
+  images.getImageUrls.mockReset().mockResolvedValue({});
   setPallets([]);
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -64,13 +61,13 @@ beforeEach(() => {
 describe('PointPalletsPanel', () => {
   it('shows nothing for an ordinary point with one pallet', () => {
     setPallets([pallet('x')]);
-    const { container } = render(<PointPalletsPanel point={point} canPlace canPick />);
+    const { container } = render(<PointPalletsPanel point={point} canPick canChange />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it('lets the avdelning allow extra pallets, in its own name', async () => {
     setPallets([pallet('x')]);
-    render(<PointPalletsPanel point={point} canManage />);
+    render(<PointPalletsPanel point={point} canGrant />);
 
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Antal pallar' }), '3');
     await userEvent.type(screen.getByRole('textbox', { name: 'Anledning' }), 'Kampanj');
@@ -83,6 +80,36 @@ describe('PointPalletsPanel', () => {
       method: 'insert',
       args: [{ point_id: 'p1', max_pallets: 3, note: 'Kampanj' }],
     });
+  });
+
+  it('gives the avdelning no way to lower or end the privilege once granted', () => {
+    setPallets([pallet('x')], [allowance]);
+    render(<PointPalletsPanel point={point} canGrant canPick />);
+
+    expect(screen.getByText(/kan bara minskas eller avslutas av LineFeeder eller teamledare/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Avsluta tillstånd' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Max pallar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tillåt extra pallar' })).not.toBeInTheDocument();
+  });
+
+  it('lets a LineFeeder lower the maximum, but not raise it', async () => {
+    setPallets([pallet('x')], [allowance]);
+    render(<PointPalletsPanel point={point} canChange />);
+
+    const max = screen.getByRole('combobox', { name: 'Max pallar' });
+    expect(within(max).getAllByRole('option').map((o) => o.textContent)).toEqual(['2', '3']);
+    await userEvent.selectOptions(max, '2');
+    await userEvent.click(screen.getByRole('button', { name: 'Ändra' }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Nu tillåts max 2 pallar'));
+    expect(mock.calls).toContainEqual({ table: 'point_allowances', method: 'update', args: [{ max_pallets: 2 }] });
+  });
+
+  it('lets a team leader raise the maximum', () => {
+    setPallets([pallet('x')], [allowance]);
+    render(<PointPalletsPanel point={point} canChange canRaise />);
+    const options = within(screen.getByRole('combobox', { name: 'Max pallar' })).getAllByRole('option');
+    expect(options.map((o) => o.textContent)).toEqual(['2', '3', '4', '5', '6', '7', '8', '9', '10']);
   });
 
   it('lists every pallet with who placed it and its comment, and each can be picked', async () => {
@@ -102,27 +129,9 @@ describe('PointPalletsPanel', () => {
     expect(mock.calls).toContainEqual({ table: 'point_pallets', method: 'eq', args: ['id', 'y'] });
   });
 
-  it('lets a LineFeeder add an extra pallet with a photo while there is room', async () => {
-    setPallets([pallet('x')], [allowance]);
-    render(<PointPalletsPanel point={point} canPlace canPick />);
-
-    await userEvent.type(screen.getByRole('textbox', { name: 'Kommentar till extrapallen' }), 'Kampanjpall');
-    const photo = new File(['x'], 'pall.jpg', { type: 'image/jpeg' });
-    await userEvent.upload(screen.getByLabelText('Foto av extrapallen'), photo);
-
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Extrapallen är registrerad'));
-    expect(images.uploadPointImage).toHaveBeenCalledWith('p1', photo, 'Kampanjpall');
-    expect(mock.calls).toContainEqual({
-      table: 'point_pallets',
-      method: 'insert',
-      args: [{ point_id: 'p1', image_id: 'img-new', note: 'Kampanjpall' }],
-    });
-  });
-
-  it('offers no extra pallet when the point is full, and explains refusals', async () => {
+  it('explains when the privilege cannot be ended yet', async () => {
     setPallets([pallet('x'), pallet('y'), pallet('z')], [allowance]);
-    render(<PointPalletsPanel point={point} canPlace canManage />);
-    expect(screen.queryByRole('button', { name: /Lägg till extrapall/ })).not.toBeInTheDocument();
+    render(<PointPalletsPanel point={point} canChange />);
 
     mock.respond('point_allowances', { error: { message: 'PICK_EXTRA_FIRST:3' } });
     await userEvent.click(screen.getByRole('button', { name: 'Avsluta tillstånd' }));

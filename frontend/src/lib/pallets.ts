@@ -112,7 +112,8 @@ export function palletErrorMessage(error: unknown): string {
   const wait = rateLimitSeconds(error);
   if (wait !== null) return `${RATE_LIMIT_MESSAGE} Försök igen om ${wait} s.`;
 
-  const [, code, count] = message.match(/(PALLET_LIMIT|ALLOWANCE_TOO_LOW|PICK_EXTRA_FIRST):(\d+)/) ?? [];
+  const [, code, count] = message.match(/(PALLET_LIMIT|ALLOWANCE_TOO_LOW|PICK_EXTRA_FIRST|ONLY_LOWER):(\d+)/) ?? [];
+  if (code === 'ONLY_LOWER') return `Avdelningen har tillåtit max ${count} pallar. Bara en teamledare kan höja det.`;
   if (code === 'PALLET_LIMIT') {
     return count === '1'
       ? 'Punkten har redan en pall. Avdelningen kan tillåta extra pallar.'
