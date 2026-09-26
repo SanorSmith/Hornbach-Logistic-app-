@@ -255,23 +255,48 @@ begin
   perform pg_temp.ok((select end_reason from public.point_allowances where id = v_allow2) = 'STATUS', 'privilege ended by the status change');
   perform pg_temp.ok((select count(*) from public.point_pallets where point_id = p2 and picked_as_extra) = 1, 'one of the two closed as extra');
 
+  -- 11b. There is no per-pallet pick button: the LineFeeder makes the point
+  -- LEDIG and every pallet on it is registered as picked, by the LineFeeder.
+  perform pg_temp.act_as(null);
+  perform pg_temp.cool_down(lf);
+  perform pg_temp.act_as(lf);
+  update public.red_points set status = 'UPPTAGEN' where id = p1;
+  insert into public.point_allowances (point_id, max_pallets, authorized_by_name)
+    values (p1, 3, 'Jonas Järn');
+  insert into public.point_pallets (point_id, note) values (p1, 'extra 1');
+  perform pg_temp.act_as(null);
+  perform pg_temp.cool_down(lf);
+  perform pg_temp.act_as(lf);
+  insert into public.point_pallets (point_id, note) values (p1, 'extra 2');
+  update public.red_points set status = 'LEDIG' where id = p1;
+  perform pg_temp.act_as(null);
+  perform pg_temp.ok(public.open_pallet_count(p1) = 0, 'LEDIG picks all three pallets');
+  perform pg_temp.ok((select count(*) from public.point_pallets
+    where point_id = p1 and id not in (v_first, v_second, v_third) and picked_by = lf) = 3,
+    'all three registered as picked by the LineFeeder');
+  perform pg_temp.ok((select count(*) from public.point_pallets
+    where point_id = p1 and id not in (v_first, v_second, v_third) and picked_as_extra) = 2,
+    'two of them picked as extra pallets');
+  perform pg_temp.ok(not exists (select 1 from public.point_allowances where point_id = p1 and ended_at is null),
+    'the privilege ended with the LEDIG');
+
   -- 12. Reports count every pallet, for the team leader's store only.
   perform pg_temp.act_as(tl);
   v_report := public.get_report(v_from, now() + interval '1 hour', 'day', null);
   perform pg_temp.act_as(null);
-  perform pg_temp.ok((v_report #>> '{totals,pallets_placed}')::int = 5, 'pallets_placed = 2 status + 3 extra, got ' || (v_report #>> '{totals,pallets_placed}'));
-  perform pg_temp.ok((v_report #>> '{totals,pallets_picked}')::int = 5, 'pallets_picked = 2 status + 3 extra, got ' || (v_report #>> '{totals,pallets_picked}'));
-  perform pg_temp.ok((v_report #>> '{totals,extra_pallets_placed}')::int = 3, 'extra_pallets_placed = 3');
-  perform pg_temp.ok((v_report #>> '{totals,allowances_granted}')::int = 3, 'allowances_granted = 3');
+  perform pg_temp.ok((v_report #>> '{totals,pallets_placed}')::int = 8, 'pallets_placed = 3 status + 5 extra, got ' || (v_report #>> '{totals,pallets_placed}'));
+  perform pg_temp.ok((v_report #>> '{totals,pallets_picked}')::int = 8, 'pallets_picked = 3 status + 5 extra, got ' || (v_report #>> '{totals,pallets_picked}'));
+  perform pg_temp.ok((v_report #>> '{totals,extra_pallets_placed}')::int = 5, 'extra_pallets_placed = 5');
+  perform pg_temp.ok((v_report #>> '{totals,allowances_granted}')::int = 4, 'allowances_granted = 4');
   perform pg_temp.ok((v_report #>> '{totals,skrap_reported}')::int = 1, 'skrap_reported = 1');
   perform pg_temp.ok(
     (select (u ->> 'allowances_granted')::int = 0 and (u ->> 'pallets_picked')::int = 1
      from jsonb_array_elements(v_report -> 'by_user') u where u ->> 'id' = dep::text),
     'the avdelning user is credited with its pick only');
   perform pg_temp.ok(
-    (select (u ->> 'allowances_granted')::int = 2
+    (select (u ->> 'allowances_granted')::int = 3
      from jsonb_array_elements(v_report -> 'by_user') u where u ->> 'id' = lf::text),
-    'the LineFeeder is credited with the two privileges it registered');
+    'the LineFeeder is credited with the three privileges it registered');
   perform pg_temp.act_as(dep);
   perform pg_temp.expect_error($q$select public.get_report(now() - interval '1 day', now(), 'day', null)$q$, 'Not allowed');
 

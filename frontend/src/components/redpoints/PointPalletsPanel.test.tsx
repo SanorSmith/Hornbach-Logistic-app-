@@ -62,13 +62,13 @@ beforeEach(() => {
 describe('PointPalletsPanel', () => {
   it('shows nothing for an ordinary point with one pallet', () => {
     setPallets([pallet('x')]);
-    const { container } = render(<PointPalletsPanel point={point} canPick canChange />);
+    const { container } = render(<PointPalletsPanel point={point} canChange />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it('gives the avdelning no way to lower or end the privilege once granted', () => {
     setPallets([pallet('x')], [allowance]);
-    render(<PointPalletsPanel point={point} canPick />);
+    render(<PointPalletsPanel point={point} />);
 
     expect(screen.getByText('Tillståndet hanteras av LineFeeder.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Avsluta tillstånd' })).not.toBeInTheDocument();
@@ -101,9 +101,9 @@ describe('PointPalletsPanel', () => {
     expect(options.map((o) => o.textContent)).toEqual(['2', '3', '4', '5', '6', '7', '8', '9', '10']);
   });
 
-  it('lists every pallet with who placed it and its comment, and each can be picked', async () => {
+  it('lists every pallet with who placed it and its comment, with no pick button per pallet', () => {
     setPallets([pallet('x'), pallet('y', { is_extra: true, note: 'Grillkol' })], [allowance]);
-    render(<PointPalletsPanel point={point} canPick />);
+    render(<PointPalletsPanel point={point} canChange canRaise />);
 
     expect(screen.getByText(/Extra pallar tillåtna \(max 3\) av Anna Avdelning/)).toBeInTheDocument();
     expect(screen.getByText(/Kampanj v\. 40/)).toBeInTheDocument();
@@ -112,10 +112,9 @@ describe('PointPalletsPanel', () => {
     expect(within(items[1]).getByText('Grillkol')).toBeInTheDocument();
     expect(within(items[1]).getByText(/Lars LineFeeder/)).toBeInTheDocument();
 
-    mock.respond('point_pallets', { data: [{ id: 'y' }] }); // the pick
-    await userEvent.click(screen.getByRole('button', { name: 'Pall 2 plockad' }));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Pallen är plockad'));
-    expect(mock.calls).toContainEqual({ table: 'point_pallets', method: 'eq', args: ['id', 'y'] });
+    // Picked all at once with "Markera som Ledig".
+    expect(screen.queryByRole('button', { name: /plockad/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Alla pallar registreras som plockade när punkten markeras som Ledig.')).toBeInTheDocument();
   });
 
   it('explains when the privilege cannot be ended yet', async () => {

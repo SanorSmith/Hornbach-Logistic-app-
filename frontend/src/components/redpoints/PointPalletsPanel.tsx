@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Layers, Loader2, Package } from 'lucide-react';
+import { Layers, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { sv } from 'date-fns/locale';
@@ -14,15 +14,12 @@ import {
   MIN_PALLETS,
   palletErrorMessage,
   palletSummary,
-  pickPallet,
 } from '../../lib/pallets';
 import { getImageUrls } from '../../lib/pointImages';
 
 export interface PalletAccess {
   /** Register pallets with "Markera som Upptagen" (LineFeeder, team leader, admin). */
   canPlace?: boolean;
-  /** Mark a pallet as picked. */
-  canPick?: boolean;
   /**
    * "Tillåt extra pallar" (LineFeeder, team leader, admin; never the
    * avdelning). Shown in the dialog under the status buttons.
@@ -34,7 +31,7 @@ export interface PalletAccess {
   canRaise?: boolean;
 }
 
-interface PointPalletsPanelProps extends Pick<PalletAccess, 'canPick' | 'canChange' | 'canRaise'> {
+interface PointPalletsPanelProps extends Pick<PalletAccess, 'canChange' | 'canRaise'> {
   point: RedPoint;
 }
 
@@ -46,11 +43,12 @@ const ago = (iso: string) => formatDistanceToNow(new Date(iso), { addSuffix: tru
  * The pallets on a point and its extra pallet privilege ("Extrapallar").
  * Shown only while the point may or does hold more than one pallet. Pallets
  * are added with "Markera som Upptagen"; the privilege is granted with
- * "Tillåt extra pallar" (GrantExtraPallets) under the status buttons.
+ * "Tillåt extra pallar" (GrantExtraPallets) under the status buttons. There is
+ * no pick button per pallet: "Markera som Ledig" registers every pallet on the
+ * point as picked (sync_pallets_with_status in the database).
  */
 export default function PointPalletsPanel({
   point,
-  canPick = false,
   canChange = false,
   canRaise = false,
 }: PointPalletsPanelProps) {
@@ -142,20 +140,15 @@ export default function PointPalletsPanel({
                 </p>
                 {pallet.note && <p className="break-words text-xs text-gray-700">{pallet.note}</p>}
               </div>
-              {canPick && open.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => run(`pick-${pallet.id}`, () => pickPallet(pallet.id), 'Pallen är plockad')}
-                  disabled={busy !== null}
-                  aria-label={`Pall ${i + 1} plockad`}
-                  className="shrink-0 rounded-lg bg-ledig px-3 py-2 text-xs font-semibold text-white hover:bg-ledig-dark disabled:opacity-50"
-                >
-                  {busy === `pick-${pallet.id}` ? <Loader2 size={14} className="animate-spin" /> : 'Plockad'}
-                </button>
-              )}
             </li>
           ))}
         </ul>
+      )}
+
+      {open.length > 1 && (
+        <p className="mt-2 text-xs text-indigo-900">
+          Alla pallar registreras som plockade när punkten markeras som Ledig.
+        </p>
       )}
 
       {allowance && canChange && (

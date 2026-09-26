@@ -222,7 +222,7 @@ test.describe('Extra pallets', () => {
     await expect(page.getByRole('button', { name: 'Tillåt extra pallar' })).toHaveCount(0);
   });
 
-  test('a LineFeeder sees every pallet on the point and picks an extra one', async ({ page }) => {
+  test('a LineFeeder sees every pallet on the point and picks them all with Markera som Ledig', async ({ page }) => {
     const db = await fakeSupabase(page, { role: 'LINEFEEDER', extraPallets: true });
     await logIn(page);
     await expect(page.getByText('2/3 pallar')).toBeVisible(); // on the J2 card
@@ -233,13 +233,12 @@ test.describe('Extra pallets', () => {
     await expect(dialog.getByRole('listitem')).toHaveCount(2);
     await expect(dialog.getByText('Grillkol')).toBeVisible();
 
-    await dialog.getByRole('button', { name: 'Pall 2 plockad' }).click();
-    await expect(dialog.getByRole('listitem')).toHaveCount(1);
-    expect(db.palletWrites).toContainEqual(
-      expect.objectContaining({ table: 'point_pallets', method: 'PATCH', body: expect.objectContaining({ id: 'pl2' }) })
-    );
-    // Room for another pallet again: Upptagen counts up.
-    await expect(dialog.getByRole('button', { name: 'Markera som Upptagen (2/3)' })).toBeEnabled();
+    // No pick button per pallet: Ledig picks them all.
+    await expect(dialog.getByRole('button', { name: /plockad/i })).toHaveCount(0);
+    await dialog.getByRole('button', { name: /Markera som Ledig/ }).click();
+    await expect(page.getByText('Status uppdaterad!')).toBeVisible();
+    expect(db.statusUpdates).toEqual([{ id: 'p2', body: { status: 'LEDIG' } }]);
+    await expect(page.getByText('2/3 pallar')).toHaveCount(0);
   });
 
   test('Markera som Upptagen registers each extra pallet with its photo, up to the allowed number', async ({ page }) => {

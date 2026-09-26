@@ -120,6 +120,8 @@ export default function PointActionModal({
       await handleFailedChange(newStatus);
       return;
     }
+    // Leaving Upptagen picks every pallet on the point (in the database).
+    if (point.status === 'UPPTAGEN') void loadPallets();
     onClose();
   };
 
@@ -338,7 +340,6 @@ export default function PointActionModal({
 
           <PointPalletsPanel
             point={point}
-            canPick={palletAccess?.canPick}
             canChange={palletAccess?.canChange}
             canRaise={palletAccess?.canRaise}
           />

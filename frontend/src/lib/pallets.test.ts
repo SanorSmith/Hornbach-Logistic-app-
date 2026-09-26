@@ -8,7 +8,7 @@ const images = vi.hoisted(() => ({
 }));
 vi.mock('./pointImages', () => images);
 
-import { allowanceAuthorizer, grantAllowance, palletErrorMessage, palletSummary, pickPallet, placePallet } from './pallets';
+import { allowanceAuthorizer, grantAllowance, palletErrorMessage, palletSummary, placePallet } from './pallets';
 import type { PointAllowance, PointPallet } from '../types';
 
 const pallet = (id: string, point_id: string, picked_at: string | null = null): PointPallet => ({
@@ -89,19 +89,6 @@ describe('placePallet', () => {
     mock.respond('point_pallets', { error: { message: 'PALLET_LIMIT:3' } });
     await expect(placePallet('p1', photo, '')).rejects.toMatchObject({ message: 'PALLET_LIMIT:3' });
     expect(images.deletePointImage).toHaveBeenCalledWith('img-1');
-  });
-});
-
-describe('pickPallet', () => {
-  it('marks the pallet as picked', async () => {
-    mock.respond('point_pallets', { data: [{ id: 'x' }] });
-    await pickPallet('x');
-    expect(mock.calls).toContainEqual({ table: 'point_pallets', method: 'eq', args: ['id', 'x'] });
-  });
-
-  it('reports a pick that row level security silently refused', async () => {
-    mock.respond('point_pallets', { data: [] });
-    await expect(pickPallet('x')).rejects.toThrow('not allowed');
   });
 });
 
