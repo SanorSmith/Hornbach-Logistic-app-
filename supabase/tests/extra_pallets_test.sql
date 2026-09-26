@@ -1,6 +1,7 @@
--- Tests for migrations/20260926130000_extra_pallets.sql.
+-- Tests for migrations/20260926130000_extra_pallets.sql and
+-- 20260926150000_extra_pallets_rules.sql.
 --
--- Run the migration and then this file as ONE batch (one transaction), e.g.
+-- Run the migrations not yet applied and then this file as ONE batch (one transaction), e.g.
 -- through the Supabase SQL editor or the MCP execute_sql tool. The script
 -- always ends with an exception, so the migration, the test store and every
 -- test row are rolled back, whether the tests pass or fail:
@@ -135,10 +136,24 @@ begin
     'extra pallets are marked extra and linked to the privilege');
   perform pg_temp.ok(public.open_pallet_count(p1) = 3, 'three pallets on the point');
 
-  -- 6. The privilege can't be ended or lowered below the pallets on the point.
+  -- 6. Once granted, the avdelning can't change or end the privilege
+  --    (20260926150000_extra_pallets_rules.sql): row level security skips it.
   perform pg_temp.act_as(dep);
+  update public.point_allowances set max_pallets = 2 where id = v_allow;
+  get diagnostics v_n = row_count;
+  perform pg_temp.ok(v_n = 0, 'the avdelning cannot lower its privilege');
+  update public.point_allowances set ended_at = now() where id = v_allow;
+  get diagnostics v_n = row_count;
+  perform pg_temp.ok(v_n = 0, 'the avdelning cannot end its privilege');
+
+  -- A LineFeeder may only lower or end it, and never below the pallets on the point.
+  perform pg_temp.act_as(lf);
+  perform pg_temp.expect_error(format('update public.point_allowances set max_pallets = 4 where id = %L', v_allow), 'ONLY_LOWER:3');
   perform pg_temp.expect_error(format('update public.point_allowances set ended_at = now() where id = %L', v_allow), 'PICK_EXTRA_FIRST:3');
   perform pg_temp.expect_error(format('update public.point_allowances set max_pallets = 2 where id = %L', v_allow), 'ALLOWANCE_TOO_LOW:3');
+
+  -- A team leader may raise it; nobody may rewrite who granted it.
+  perform pg_temp.act_as(tl);
   perform pg_temp.expect_error(format('update public.point_allowances set granted_by = %L where id = %L', tl, v_allow), 'Only the maximum');
   update public.point_allowances set max_pallets = 4 where id = v_allow;
 
@@ -175,6 +190,15 @@ begin
   perform pg_temp.ok((select status from public.red_points where id = p1) = 'LEDIG', 'last pallet picked -> LEDIG');
   perform pg_temp.ok(not (select picked_as_extra from public.point_pallets where id = v_first), 'the last pick is not extra');
 
+  -- 10b. A LineFeeder may end a privilege early once at most one pallet is left.
+  perform pg_temp.act_as(tl);
+  insert into public.point_allowances (point_id, max_pallets) values (p1, 2) returning id into v_allow;
+  perform pg_temp.act_as(lf);
+  update public.point_allowances set ended_at = now() where id = v_allow;
+  perform pg_temp.act_as(null);
+  select * into v_grant from public.point_allowances where id = v_allow;
+  perform pg_temp.ok(v_grant.end_reason = 'MANUAL' and v_grant.ended_by = lf, 'the LineFeeder ended the privilege');
+
   -- 11. Status buttons: UPPTAGEN registers a pallet; SKRAP closes all of them.
   perform pg_temp.cool_down(lf);
   perform pg_temp.act_as(tl);
@@ -197,7 +221,7 @@ begin
   perform pg_temp.ok((v_report #>> '{totals,pallets_placed}')::int = 5, 'pallets_placed = 2 status + 3 extra, got ' || (v_report #>> '{totals,pallets_placed}'));
   perform pg_temp.ok((v_report #>> '{totals,pallets_picked}')::int = 5, 'pallets_picked = 2 status + 3 extra, got ' || (v_report #>> '{totals,pallets_picked}'));
   perform pg_temp.ok((v_report #>> '{totals,extra_pallets_placed}')::int = 3, 'extra_pallets_placed = 3');
-  perform pg_temp.ok((v_report #>> '{totals,allowances_granted}')::int = 2, 'allowances_granted = 2');
+  perform pg_temp.ok((v_report #>> '{totals,allowances_granted}')::int = 3, 'allowances_granted = 3');
   perform pg_temp.ok((v_report #>> '{totals,skrap_reported}')::int = 1, 'skrap_reported = 1');
   perform pg_temp.ok(
     (select (u ->> 'allowances_granted')::int = 1 and (u ->> 'pallets_picked')::int = 1
