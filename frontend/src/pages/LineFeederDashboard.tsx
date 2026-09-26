@@ -18,6 +18,8 @@ import { findPointByScan } from '../lib/scanLookup';
 import ScannerReadyBadge from '../components/redpoints/ScannerReadyBadge';
 import toast from 'react-hot-toast';
 
+const STATUS_FILTERS = ['ALL', 'KUNDORDER', 'SKRAP', 'UPPTAGEN', 'LEDIG'] as const;
+
 export default function LineFeederDashboard() {
   const navigate = useNavigate();
   const { points, updatePointStatus } = useRedPoints();
@@ -32,7 +34,11 @@ export default function LineFeederDashboard() {
   const selectedPoint = points.find((p) => p.id === selectedPointId) ?? null;
   const [showScanner, setShowScanner] = useState(false);
   const scannerDialogRef = useDialog(showScanner, () => setShowScanner(false));
-  const [filterStatus, setFilterStatus] = useState<PointStatus | 'ALL'>('ALL');
+  // Remembered on this device too; anything unknown falls back to every status.
+  const [storedStatus, setFilterStatus] = useDeviceSetting('linefeeder.status');
+  const filterStatus: PointStatus | 'ALL' = (STATUS_FILTERS as readonly string[]).includes(storedStatus)
+    ? (storedStatus as PointStatus | 'ALL')
+    : 'ALL';
   // '' = every avdelning. Remembered on this device: a handheld usually serves
   // the same avdelning. A remembered avdelning that no longer exists is ignored.
   const [storedDepartment, setFilterDepartment] = useDeviceSetting('linefeeder.avdelning');
@@ -175,10 +181,10 @@ export default function LineFeederDashboard() {
           <div className="flex items-center gap-2 flex-wrap">
             <Filter size={20} className="text-gray-600" />
             <span className="text-sm font-medium text-gray-700">Filtrera:</span>
-            {(['ALL', 'KUNDORDER', 'SKRAP', 'UPPTAGEN', 'LEDIG'] as const).map((status) => (
+            {STATUS_FILTERS.map((status) => (
               <button
                 key={status}
-                onClick={() => setFilterStatus(status)}
+                onClick={() => setFilterStatus(status === 'ALL' ? '' : status)}
                 className={`
                   px-3 py-1 rounded-full text-sm font-medium transition
                   ${filterStatus === status
