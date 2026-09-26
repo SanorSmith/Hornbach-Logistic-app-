@@ -154,6 +154,15 @@ test.describe('Avdelning dashboard', () => {
 });
 
 test.describe('Extra pallets', () => {
+  test('the Monitor shows who authorized the extra pallets on the card', async ({ page }) => {
+    await fakeSupabase(page, { role: 'MONITOR', extraPallets: true });
+    await logIn(page);
+    await expect(page).toHaveURL(/\/monitor$/);
+    const card = page.locator('[role="button"]', { has: page.getByRole('heading', { name: 'J2', exact: true }) });
+    await expect(card.getByText('2/3 pallar')).toBeVisible();
+    await expect(card.getByText('Godkänt av Kalle Bygg')).toBeVisible();
+  });
+
   test('the avdelning cannot allow extra pallets, not even on its own point', async ({ page }) => {
     await fakeSupabase(page, { role: 'DEPARTMENT', department_id: 'd-bygg' });
     await logIn(page);
@@ -220,7 +229,7 @@ test.describe('Extra pallets', () => {
 
     await cardTitles(page).filter({ hasText: /^J2$/ }).click();
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText(/Extra pallar tillåtna \(max 3\) av Jonas Järn/)).toBeVisible();
+    await expect(dialog.getByText(/Extra pallar tillåtna \(max 3\) av Kalle Bygg \(reg\. Jonas Järn\)/)).toBeVisible();
     await expect(dialog.getByRole('listitem')).toHaveCount(2);
     await expect(dialog.getByText('Grillkol')).toBeVisible();
 

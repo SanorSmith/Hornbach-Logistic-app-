@@ -140,4 +140,12 @@ describe('PalletBadge', () => {
     const { container } = render(<PalletBadge pointId="p1" />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('shows who authorized the extra pallets when asked (Monitor)', () => {
+    setPallets([pallet('x')], [{ ...allowance, authorized_by_name: 'Kalle Bygg' }]);
+    const { rerender } = render(<PalletBadge pointId="p1" />);
+    expect(screen.queryByText(/Godkänt av/)).not.toBeInTheDocument();
+    rerender(<PalletBadge pointId="p1" showAuthorizer />);
+    expect(screen.getByText('Godkänt av Kalle Bygg')).toBeInTheDocument();
+  });
 });
