@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Home, Monitor as MonitorIcon, RefreshCw } from 'lucide-react';
+import { useRedPointsStore } from '../store/redPointsStore';
 import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
 import RedPointGrid from '../components/redpoints/RedPointGrid';
@@ -12,16 +13,10 @@ export default function MonitorDashboard() {
   const navigate = useNavigate();
   const { points } = useRedPoints();
   const { assignments } = useDepartmentAssignments();
-  const [lastUpdate, setLastUpdate] = useState(new Date());
+  // When the data last changed, not a ticking clock: re-rendering the whole
+  // grid every second wore out low-power screens left on all day.
+  const lastSyncedAt = useRedPointsStore((state) => state.lastSyncedAt);
   const [viewedPoint, setViewedPoint] = useState<RedPoint | null>(null);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLastUpdate(new Date());
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const statusCounts = points.reduce((acc, point) => {
     acc[point.status] = (acc[point.status] || 0) + 1;
@@ -47,8 +42,10 @@ export default function MonitorDashboard() {
             
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-sm text-gray-400">
-                <RefreshCw size={16} className="animate-spin" />
-                <span>Uppdaterad: {lastUpdate.toLocaleTimeString('sv-SE')}</span>
+                <RefreshCw size={16} />
+                <span>
+                  Uppdaterad: {lastSyncedAt ? new Date(lastSyncedAt).toLocaleTimeString('sv-SE') : '–'}
+                </span>
               </div>
               <button
                 onClick={() => navigate('/')}

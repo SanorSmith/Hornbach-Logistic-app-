@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, TrendingUp, Users, MapPin, Activity, BarChart3 } from 'lucide-react';
@@ -22,17 +22,18 @@ interface LineFeeder {
   is_active: boolean;
 }
 
-interface LineFeederPerformance {
+/** What a LineFeeder has done today, straight from status_history. */
+interface LineFeederToday {
   userId: string;
-  userName: string;
-  blocksProcessed: number;
+  palletsPlaced: number;
+  palletsPicked: number;
   statusChanges: number;
-  averageTimePerBlock: number; // in minutes
-  idleTime: number; // in minutes
-  shiftStart: string;
-  lastActivity: string;
-  efficiency: number; // percentage
+  firstActivity: string | null;
+  lastActivity: string | null;
 }
+
+const formatTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
 
 export default function TeamLeaderDashboard() {
   const navigate = useNavigate();
@@ -48,23 +49,24 @@ export default function TeamLeaderDashboard() {
   const [loading, setLoading] = useState(true);
   const [lineFeeders, setLineFeeders] = useState<LineFeeder[]>([]);
   const [selectedLineFeeder, setSelectedLineFeeder] = useState<string>('');
-  const [lineFeederPerformance, setLineFeederPerformance] = useState<LineFeederPerformance | null>(null);
+  const [lineFeederPerformance, setLineFeederPerformance] = useState<LineFeederToday | null>(null);
   const [performanceLoading, setPerformanceLoading] = useState(false);
 
   useEffect(() => {
     fetchStats();
     fetchLineFeeders();
     
-    // Subscribe to real-time updates
-    const subscription = supabase
-      .channel('team-leader-stats')
+    // Subscribe to real-time updates. A unique name per mount: a fixed name can
+    // hand back the previous, still-closing channel after navigating back.
+    const channel = supabase
+      .channel(`team-leader-stats-${crypto.randomUUID()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'red_points' }, () => {
         fetchStats();
       })
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -92,62 +94,52 @@ export default function TeamLeaderDashboard() {
     }
   };
 
+  // Only the answer for the LineFeeder picked last may be shown.
+  const performanceRequest = useRef(0);
+
   const fetchLineFeederPerformance = async (userId: string) => {
     if (!userId) return;
-    
+    const request = ++performanceRequest.current;
+
     setPerformanceLoading(true);
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
-      // Get today's status changes for this user
-      const { data: statusChanges, error: changesError } = await supabase
+
+      const { data, error } = await supabase
         .from('status_history')
-        .select('*')
+        .select('old_status, new_status, timestamp')
         .eq('user_id', userId)
         .gte('timestamp', today.toISOString())
-        .order('timestamp', { ascending: false });
+        .order('timestamp', { ascending: true });
 
-      if (changesError) throw changesError;
+      if (error) throw error;
+      if (request !== performanceRequest.current) return;
 
-      // Calculate performance metrics
-      const blocksProcessed = statusChanges?.length || 0;
-      const averageTimePerBlock = blocksProcessed > 0 ? 5 : 0; // Default 5 minutes per block
-      const efficiency = blocksProcessed > 0 ? Math.min(100, (blocksProcessed / 8) * 100) : 0; // 8 blocks = 100%
-      
-      const now = new Date();
-      const shiftStart = new Date(today.setHours(6, 0, 0, 0)); // 6 AM shift start
-      const shiftDuration = (now.getTime() - shiftStart.getTime()) / (1000 * 60); // in minutes
-      const workTime = blocksProcessed * averageTimePerBlock;
-      const idleTime = Math.max(0, shiftDuration - workTime);
-
-      // Get user info
-      const user = lineFeeders.find(lf => lf.id === userId);
-      
+      const changes = (data ?? []).filter((c) => c.old_status !== c.new_status);
       setLineFeederPerformance({
         userId,
-        userName: user?.full_name || 'Unknown',
-        blocksProcessed,
-        statusChanges: blocksProcessed,
-        averageTimePerBlock,
-        idleTime: Math.round(idleTime),
-        shiftStart: shiftStart.toISOString(),
-        lastActivity: statusChanges?.[0]?.timestamp || now.toISOString(),
-        efficiency: Math.round(efficiency)
+        palletsPlaced: changes.filter((c) => c.new_status === 'UPPTAGEN').length,
+        palletsPicked: changes.filter((c) => c.old_status === 'UPPTAGEN').length,
+        statusChanges: changes.length,
+        firstActivity: changes[0]?.timestamp ?? null,
+        lastActivity: changes[changes.length - 1]?.timestamp ?? null,
       });
     } catch (error) {
       console.error('Error fetching line feeder performance:', error);
+      if (request === performanceRequest.current) setLineFeederPerformance(null);
     } finally {
-      setPerformanceLoading(false);
+      if (request === performanceRequest.current) setPerformanceLoading(false);
     }
   };
 
   const handleLineFeederChange = (userId: string) => {
     setSelectedLineFeeder(userId);
+    setLineFeederPerformance(null);
     if (userId) {
       fetchLineFeederPerformance(userId);
     } else {
-      setLineFeederPerformance(null);
+      performanceRequest.current += 1; // ignore any answer still on its way
     }
   };
 
@@ -361,7 +353,7 @@ export default function TeamLeaderDashboard() {
                 <BarChart3 className="text-orange-600" size={24} />
                 <div className="text-left">
                   <h3 className="font-semibold text-orange-900">LineFeeder Rapport</h3>
-                  <p className="text-xs text-orange-600">Prestationsövervakning</p>
+                  <p className="text-xs text-orange-600">Idag, från statushistoriken</p>
                 </div>
               </div>
               
@@ -386,30 +378,24 @@ export default function TeamLeaderDashboard() {
                   <p className="text-xs text-gray-600 mt-1">Laddar...</p>
                 </div>
               ) : lineFeederPerformance ? (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Block:</span>
-                    <span className="font-medium">{lineFeederPerformance.blocksProcessed}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Effektivitet:</span>
-                    <span className={`font-medium ${
-                      lineFeederPerformance.efficiency >= 80 ? 'text-green-600' :
-                      lineFeederPerformance.efficiency >= 60 ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
-                      {lineFeederPerformance.efficiency}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
-                    <div
-                      className={`h-1.5 rounded-full ${
-                        lineFeederPerformance.efficiency >= 80 ? 'bg-green-500' :
-                        lineFeederPerformance.efficiency >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${lineFeederPerformance.efficiency}%` }}
-                    />
-                  </div>
-                </div>
+                <dl className="space-y-1.5 text-xs">
+                  {[
+                    ['Pallar placerade', lineFeederPerformance.palletsPlaced],
+                    ['Pallar plockade', lineFeederPerformance.palletsPicked],
+                    ['Statusändringar', lineFeederPerformance.statusChanges],
+                    [
+                      'Aktiv',
+                      lineFeederPerformance.firstActivity && lineFeederPerformance.lastActivity
+                        ? `${formatTime(lineFeederPerformance.firstActivity)} – ${formatTime(lineFeederPerformance.lastActivity)}`
+                        : 'Ingen aktivitet idag',
+                    ],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex justify-between gap-2">
+                      <dt className="text-gray-600">{label}</dt>
+                      <dd className="font-medium text-gray-900 tabular-nums">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
               ) : selectedLineFeeder ? (
                 <p className="text-xs text-gray-500 text-center">Ingen data</p>
               ) : (

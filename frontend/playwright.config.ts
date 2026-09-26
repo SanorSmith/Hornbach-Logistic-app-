@@ -3,7 +3,10 @@ import { defineConfig, devices } from '@playwright/test';
 // End-to-end tests of the real app in a browser. Supabase is never contacted:
 // the app is started with a fake Supabase URL and every request to it is
 // answered by e2e/fakeSupabase.ts.
-const PORT = 5174;
+// E2E_CSP=1: test a production build served with the Content-Security-Policy
+// from vercel.json (see e2e/cspServer.mjs) instead of the dev server.
+const CSP = !!process.env.E2E_CSP;
+const PORT = CSP ? 5175 : 5174;
 
 export default defineConfig({
   testDir: './e2e',
@@ -20,12 +23,16 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    command: `npx vite --port ${PORT} --strictPort`,
+    command: CSP
+      ? 'npx vite build --outDir dist-csp --emptyOutDir && node e2e/cspServer.mjs'
+      : `npx vite --port ${PORT} --strictPort`,
     port: PORT,
     reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
     env: {
       VITE_SUPABASE_URL: 'http://supabase.test',
       VITE_SUPABASE_ANON_KEY: 'e2e-anon-key',
+      PORT: String(PORT),
     },
   },
 });

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useDialog } from '../hooks/useDialog';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Building2, QrCode, Download, MapPin, Loader2, LayoutGrid } from 'lucide-react';
@@ -17,6 +18,7 @@ import OverdueBadge from '../components/redpoints/OverdueBadge';
 import { formatDuration, isOverdue, sortPointsByName, statusSince, useNow } from '../lib/pointAge';
 import { getStatusLabel } from '../utils/statusColors';
 import { useAuth } from '../hooks/useAuth';
+import { clickableProps } from '../lib/clickable';
 
 export default function DepartmentDashboard() {
   const navigate = useNavigate();
@@ -25,10 +27,19 @@ export default function DepartmentDashboard() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [departments, setDepartments] = useState<{ id: string; name: string; location: string }[]>([]);
   const { assignments, assignedDepartments } = useDepartmentAssignments();
-  const [selectedPoint, setSelectedPoint] = useState<RedPoint | null>(null);
+  // Keep only the id: the point itself always comes from the live list, so an
+  // open dialog shows changes made on other devices.
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
+  const selectedPoint = points.find((p) => p.id === selectedPointId) ?? null;
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [qrPointNumber, setQrPointNumber] = useState<number | null>(null);
   const [qrPointId, setQrPointId] = useState<string | null>(null);
+  const closeQrGenerator = () => {
+    setShowQRGenerator(false);
+    setQrPointNumber(null);
+    setQrPointId(null);
+  };
+  const qrDialogRef = useDialog(showQRGenerator && qrPointNumber !== null, closeQrGenerator);
 
   const ownDepartmentId = user?.department_id;
   useEffect(() => {
@@ -77,7 +88,7 @@ export default function DepartmentDashboard() {
   const currentDepartment = departments.find(d => d.id === selectedDepartment);
 
   const handlePointClick = (point: RedPoint) => {
-    setSelectedPoint(point);
+    setSelectedPointId(point.id);
   };
 
   const handleUpdateStatus = async (status: PointStatus) => {
@@ -105,7 +116,7 @@ export default function DepartmentDashboard() {
       setSelectedDepartment(pointDepartment);
     }
     toast.success(`Punkt ${assignments[point.id]?.trim() || point.point_number} scannad!`);
-    setSelectedPoint(point);
+    setSelectedPointId(point.id);
   };
 
   useBarcodeScanner(handleScan, !showQRGenerator);
@@ -297,10 +308,13 @@ export default function DepartmentDashboard() {
                   <div
                     className={`
                       relative rounded-lg shadow-sm border-2 p-4 cursor-pointer
-                      transition-all hover:shadow-md
+                      transition-all hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500
                       ${overdue ? 'border-red-600 ring-2 ring-red-600/40 bg-red-50' : 'border-gray-200 bg-white'}
                     `}
-                    onClick={() => handlePointClick(point)}
+                    {...clickableProps(
+                      () => handlePointClick(point),
+                      `Punkt ${assignments[point.id]?.trim() || point.point_number}, ${getStatusLabel(point.status)}${overdue ? ', över 24 timmar' : ''}`
+                    )}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -352,8 +366,9 @@ export default function DepartmentDashboard() {
       {/* Point Action Modal */}
       {selectedPoint && (
         <PointActionModal
+          key={selectedPoint.id}
           point={selectedPoint}
-          onClose={() => setSelectedPoint(null)}
+          onClose={() => setSelectedPointId(null)}
           onUpdateStatus={handleUpdateStatus}
           allowedActions={['LEDIG', 'UPPTAGEN', 'SKRAP', 'KUNDORDER']}
           disabledActions={['UPPTAGEN']}
@@ -362,16 +377,20 @@ export default function DepartmentDashboard() {
 
       {/* QR Generator Modal */}
       {showQRGenerator && qrPointNumber && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div
+          ref={qrDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`QR-kod för punkt ${qrPointNumber}`}
+          tabIndex={-1}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none"
+        >
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">QR-kod för Punkt {qrPointNumber}</h2>
               <button
-                onClick={() => {
-                  setShowQRGenerator(false);
-                  setQrPointNumber(null);
-                  setQrPointId(null);
-                }}
+                onClick={closeQrGenerator}
+                aria-label="Stäng"
                 className="p-1 hover:bg-gray-100 rounded"
               >
                 ✕

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDialog } from '../../hooks/useDialog';
 import { X } from 'lucide-react';
 import { createAppUser } from '../../lib/adminUsers';
 import { UserRole } from '../../types';
@@ -20,6 +21,8 @@ export default function AddUserModal({ isOpen, onClose, onSuccess, departments }
     department_id: '',
   });
   const [loading, setLoading] = useState(false);
+
+  const dialogRef = useDialog(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -60,12 +63,13 @@ export default function AddUserModal({ isOpen, onClose, onSuccess, departments }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1} aria-label="Skapa ny användare" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-xl font-bold text-gray-800">Skapa Ny Användare</h2>
           <button
             onClick={onClose}
+            aria-label="Stäng"
             className="p-1 hover:bg-gray-100 rounded transition"
           >
             <X size={24} />

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useDialog } from '../hooks/useDialog';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Users, Building2, MapPin, Plus, Edit, Trash2, LayoutGrid, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import AddUserModal from '../components/admin/AddUserModal';
 import AddDepartmentModal from '../components/admin/AddDepartmentModal';
@@ -28,6 +30,7 @@ interface Department {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [stats, setStats] = useState({ totalUsers: 0, activeUsers: 0, totalDepartments: 0, totalPoints: 0 });
@@ -35,6 +38,7 @@ export default function AdminDashboard() {
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
+  const editDialogRef = useDialog(editingDepartment !== null, () => setEditingDepartment(null));
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [downloadingQr, setDownloadingQr] = useState(false);
 
@@ -107,11 +111,10 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleEditUser = (user: User) => {
-    // TODO: Implement edit user functionality
+  // Users are edited on the Team page.
+  const handleEditUser = () => {
     toast('Redigera användare via Teamhantering', { icon: 'ℹ️' });
     navigate('/team');
-    console.log('Edit user:', user);
   };
 
   const handleEditDepartment = (dept: Department) => {
@@ -364,7 +367,10 @@ export default function AdminDashboard() {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => toggleUserStatus(user.id, user.is_active)}
-                        className={`px-2 py-1 text-xs rounded-full ${
+                        // Your own account can't be deactivated from here (you'd lock yourself out).
+                        disabled={user.id === currentUser?.id}
+                        title={user.id === currentUser?.id ? 'Ditt eget konto' : user.is_active ? 'Inaktivera' : 'Aktivera'}
+                        className={`px-2 py-1 text-xs rounded-full disabled:cursor-default ${
                           user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         }`}
                       >
@@ -374,19 +380,23 @@ export default function AdminDashboard() {
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
                         <button 
-                          onClick={() => handleEditUser(user)}
+                          onClick={handleEditUser}
                           className="p-1 hover:bg-gray-100 rounded"
                           title="Redigera användare"
+                          aria-label={`Redigera ${user.full_name}`}
                         >
                           <Edit size={16} className="text-blue-600" />
                         </button>
-                        <button 
-                          onClick={() => handleDeleteUser(user)}
-                          className="p-1 hover:bg-gray-100 rounded"
-                          title="Radera användare"
-                        >
-                          <Trash2 size={16} className="text-red-600" />
-                        </button>
+                        {user.id !== currentUser?.id && (
+                          <button
+                            onClick={() => handleDeleteUser(user)}
+                            className="p-1 hover:bg-gray-100 rounded"
+                            title="Radera användare"
+                            aria-label={`Radera ${user.full_name}`}
+                          >
+                            <Trash2 size={16} className="text-red-600" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -492,12 +502,20 @@ export default function AdminDashboard() {
 
       {/* Edit Department Modal */}
       {editingDepartment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div
+          ref={editDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Redigera avdelning"
+          tabIndex={-1}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none"
+        >
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">Redigera Avdelning</h2>
               <button
                 onClick={() => setEditingDepartment(null)}
+                aria-label="Stäng"
                 className="p-1 hover:bg-gray-100 rounded"
               >
                 ✕

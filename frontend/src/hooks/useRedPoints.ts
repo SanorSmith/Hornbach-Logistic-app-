@@ -26,15 +26,28 @@ async function fetchRedPoints() {
   }
 }
 
-async function handleRealtimeUpdate(updatedPoint: RedPoint) {
-  const { data, error } = await supabase
-    .from('red_points')
-    .select('*')
-    .eq('id', updatedPoint.id)
-    .single();
+// Keep the list in step with inserts, updates and deletes from other devices.
+async function handleRealtimeChange(eventType: string, row: Partial<RedPoint>) {
+  const { removePoint, updatePoint, addPoint } = useRedPointsStore.getState();
+  if (!row.id) return;
 
-  if (!error && data) {
-    useRedPointsStore.getState().updatePoint(data as RedPoint);
+  if (eventType === 'DELETE') {
+    removePoint(row.id);
+    return;
+  }
+
+  // Read the row through the API so RLS and the column set match fetchRedPoints.
+  const { data, error } = await supabase.from('red_points').select('*').eq('id', row.id).maybeSingle();
+  if (error) return;
+
+  const point = data as RedPoint | null;
+  const exists = useRedPointsStore.getState().points.some((p) => p.id === row.id);
+  if (!point || !point.is_active) {
+    if (exists) removePoint(row.id);
+  } else if (exists) {
+    updatePoint(point);
+  } else {
+    addPoint(point);
   }
 }
 
@@ -56,12 +69,14 @@ export function useRedPoints() {
           table: 'red_points',
         },
         (payload) => {
-          if (payload.eventType === 'UPDATE') {
-            handleRealtimeUpdate(payload.new as RedPoint);
-          }
+          const row = (payload.eventType === 'DELETE' ? payload.old : payload.new) as Partial<RedPoint>;
+          handleRealtimeChange(payload.eventType, row);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        // (Re)connected: reload so changes made while offline are not missed.
+        if (status === 'SUBSCRIBED') fetchRedPoints();
+      });
 
     return () => {
       supabase.removeChannel(channel);

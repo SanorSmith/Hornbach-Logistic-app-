@@ -6,6 +6,7 @@ import { MapPin, User } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { formatDuration, isOverdue, statusSince } from '../../lib/pointAge';
 import OverdueBadge from './OverdueBadge';
+import { clickableProps } from '../../lib/clickable';
 import { sv } from 'date-fns/locale';
 
 interface RedPointCardProps {
@@ -20,6 +21,7 @@ export default function RedPointCard({ point, onClick, assignments, now }: RedPo
   const statusColor = getStatusColor(point.status);
   const isPriority = point.status === 'KUNDORDER';
   const overdue = isOverdue(point, now);
+  const name = assignments?.[point.id]?.trim() || `#${point.point_number}`;
 
   return (
     <motion.div
@@ -29,10 +31,10 @@ export default function RedPointCard({ point, onClick, assignments, now }: RedPo
       exit={{ opacity: 0, scale: 0.9 }}
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      onClick={onClick}
+      {...clickableProps(onClick, `Punkt ${name}, ${getStatusLabel(point.status)}${overdue ? ', över 24 timmar' : ''}`)}
       className={`
         relative rounded-lg shadow-sm border-2 p-4 cursor-pointer
-        transition-all hover:shadow-md
+        transition-all hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500
         ${isPriority ? 'border-kundorder ring-2 ring-kundorder/50 bg-white' : overdue ? 'border-red-600 ring-2 ring-red-600/40 bg-red-50' : 'border-gray-200 bg-white'}
       `}
     >

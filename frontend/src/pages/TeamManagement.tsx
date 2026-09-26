@@ -6,9 +6,24 @@ import { supabase } from '../lib/supabase';
 import { User, UserRole, Department } from '../types';
 import toast from 'react-hot-toast';
 import { createAppUser, deleteAppUser } from '../lib/adminUsers';
+import { useAuth } from '../hooks/useAuth';
+import { useDialog } from '../hooks/useDialog';
+import { ROLE_LABELS } from '../lib/access';
+
+// Roles that can be given out on this page. The super admin role is never
+// managed here, and only admins may create or edit admins.
+const ASSIGNABLE_ROLES: UserRole[] = ['LINEFEEDER', 'TEAM_LEADER', 'MONITOR', 'DEPARTMENT', 'ADMIN'];
 
 export default function TeamManagement() {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
+  const viewerIsAdmin = currentUser?.role === 'ADMIN';
+  const roleOptions = ASSIGNABLE_ROLES.filter((role) => viewerIsAdmin || role !== 'ADMIN');
+  /** Team leaders may not change admins; nobody may lock themselves out. */
+  const canManage = (user: User) => viewerIsAdmin || user.role !== 'ADMIN';
+  const isSelf = (user: User) => user.id === currentUser?.id;
+  const [saving, setSaving] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,6 +34,21 @@ export default function TeamManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const closeCreate = () => {
+    setShowCreateModal(false);
+    resetForm();
+  };
+  const closeEdit = () => {
+    setShowEditModal(false);
+    resetForm();
+  };
+  const closeDelete = () => {
+    setShowDeleteModal(false);
+    setSelectedUser(null);
+  };
+  const createDialogRef = useDialog(showCreateModal, closeCreate);
+  const editDialogRef = useDialog(showEditModal, closeEdit);
+  const deleteDialogRef = useDialog(showDeleteModal && selectedUser !== null, closeDelete);
   const [formData, setFormData] = useState({
     email: '',
     full_name: '',
@@ -40,11 +70,12 @@ export default function TeamManagement() {
           *,
           department:departments(id, name, location)
         `)
-        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setUsers((data ?? []) as User[]);
+      // Deactivated users stay listed (last) so they can be activated again.
+      const list = (data ?? []) as User[];
+      setUsers([...list].sort((a, b) => Number(b.is_active) - Number(a.is_active)));
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Fel vid hämtning av användare');
@@ -70,6 +101,8 @@ export default function TeamManagement() {
   };
 
   const handleCreateUser = async () => {
+    if (saving) return;
+    setSaving(true);
     try {
       if (!formData.email || !formData.full_name) {
         toast.error('Fyll i alla obligatoriska fält');
@@ -90,10 +123,14 @@ export default function TeamManagement() {
     } catch (error) {
       console.error('Error creating user:', error);
       toast.error((error as Error).message || 'Fel vid skapande av användare');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleUpdateUser = async () => {
+    if (saving) return;
+    setSaving(true);
     try {
       if (!selectedUser || !formData.full_name) {
         toast.error('Fyll i alla obligatoriska fält');
@@ -119,10 +156,14 @@ export default function TeamManagement() {
     } catch (error) {
       console.error('Error updating user:', error);
       toast.error('Fel vid uppdatering av användare');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDeleteUser = async () => {
+    if (saving) return;
+    setSaving(true);
     try {
       if (!selectedUser) return;
 
@@ -142,6 +183,8 @@ export default function TeamManagement() {
     } catch (error) {
       console.error('Error deleting user:', error);
       toast.error((error as Error).message || 'Fel vid radering av användare');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -195,8 +238,10 @@ export default function TeamManagement() {
                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'ALL' || user.role === roleFilter;
     const matchesDepartment = departmentFilter === 'ALL' || user.department_id === departmentFilter;
-    
-    return matchesSearch && matchesRole && matchesDepartment;
+    const matchesStatus =
+      statusFilter === 'ALL' || (statusFilter === 'ACTIVE' ? user.is_active : !user.is_active);
+
+    return matchesSearch && matchesRole && matchesDepartment && matchesStatus;
   });
 
   const getRoleColor = (role: UserRole) => {
@@ -268,7 +313,7 @@ export default function TeamManagement() {
       <div className="container mx-auto px-4 py-6">
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Sök användare</label>
               <div className="relative">
@@ -290,11 +335,24 @@ export default function TeamManagement() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
                 <option value="ALL">Alla roller</option>
-                <option value="ADMIN">Admin</option>
-                <option value="TEAM_LEADER">Team Leader</option>
-                <option value="LINEFEEDER">Line Feeder</option>
-                <option value="MONITOR">Monitor</option>
-                <option value="DEPARTMENT">Department</option>
+                {ASSIGNABLE_ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {ROLE_LABELS[role]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+              <select
+                id="status-filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="ALL">Alla</option>
+                <option value="ACTIVE">Aktiva</option>
+                <option value="INACTIVE">Inaktiva</option>
               </select>
             </div>
             <div>
@@ -377,6 +435,7 @@ export default function TeamManagement() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end gap-2">
+                          {canManage(user) && !isSelf(user) && (
                           <button
                             onClick={() => handleToggleUserStatus(user)}
                             className={`p-2 rounded-lg transition ${
@@ -385,23 +444,31 @@ export default function TeamManagement() {
                                 : 'bg-green-100 text-green-600 hover:bg-green-200'
                             }`}
                             title={user.is_active ? 'Inaktivera' : 'Aktivera'}
+                            aria-label={`${user.is_active ? 'Inaktivera' : 'Aktivera'} ${user.full_name}`}
                           >
                             {user.is_active ? <UserMinus size={16} /> : <UserPlus size={16} />}
                           </button>
+                          )}
+                          {canManage(user) && (
                           <button
                             onClick={() => openEditModal(user)}
                             className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition"
                             title="Redigera"
+                            aria-label={`Redigera ${user.full_name}`}
                           >
                             <Edit2 size={16} />
                           </button>
+                          )}
+                          {canManage(user) && !isSelf(user) && (
                           <button
                             onClick={() => openDeleteModal(user)}
                             className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition"
                             title="Radera"
+                            aria-label={`Radera ${user.full_name}`}
                           >
                             <Trash2 size={16} />
                           </button>
+                          )}
                         </div>
                       </td>
                     </motion.tr>
@@ -427,7 +494,12 @@ export default function TeamManagement() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            ref={createDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Skapa användare"
+            tabIndex={-1}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -467,11 +539,11 @@ export default function TeamManagement() {
                     onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
-                    <option value="LINEFEEDER">Line Feeder</option>
-                    <option value="TEAM_LEADER">Team Leader</option>
-                    <option value="MONITOR">Monitor</option>
-                    <option value="DEPARTMENT">Department</option>
-                    <option value="ADMIN">Admin</option>
+                    {roleOptions.map((role) => (
+                      <option key={role} value={role}>
+                        {ROLE_LABELS[role]}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 
@@ -491,33 +563,22 @@ export default function TeamManagement() {
                   </select>
                 </div>
                 
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="is_active"
-                    checked={formData.is_active}
-                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                  />
-                  <label htmlFor="is_active" className="ml-2 text-sm text-gray-700">
-                    Aktiv användare
-                  </label>
-                </div>
+                <p className="text-xs text-gray-500">
+                  Nya konton är aktiva direkt. Användaren får ett tillfälligt lösenord och måste byta det vid första inloggningen.
+                </p>
               </div>
               
               <div className="flex justify-end gap-3 mt-6">
                 <button
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    resetForm();
-                  }}
+                  onClick={closeCreate}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                 >
                   Avbryt
                 </button>
                 <button
+                  disabled={saving}
                   onClick={handleCreateUser}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Skapa användare
                 </button>
@@ -534,7 +595,12 @@ export default function TeamManagement() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            ref={editDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Redigera användare"
+            tabIndex={-1}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -571,15 +637,16 @@ export default function TeamManagement() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Roll</label>
                   <select
+                    disabled={!!selectedUser && isSelf(selectedUser)}
                     value={formData.role}
                     onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
-                    <option value="LINEFEEDER">Line Feeder</option>
-                    <option value="TEAM_LEADER">Team Leader</option>
-                    <option value="MONITOR">Monitor</option>
-                    <option value="DEPARTMENT">Department</option>
-                    <option value="ADMIN">Admin</option>
+                    {roleOptions.map((role) => (
+                      <option key={role} value={role}>
+                        {ROLE_LABELS[role]}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 
@@ -603,6 +670,7 @@ export default function TeamManagement() {
                   <input
                     type="checkbox"
                     id="edit_is_active"
+                    disabled={!!selectedUser && isSelf(selectedUser)}
                     checked={formData.is_active}
                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                     className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
@@ -615,17 +683,15 @@ export default function TeamManagement() {
               
               <div className="flex justify-end gap-3 mt-6">
                 <button
-                  onClick={() => {
-                    setShowEditModal(false);
-                    resetForm();
-                  }}
+                  onClick={closeEdit}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                 >
                   Avbryt
                 </button>
                 <button
+                  disabled={saving}
                   onClick={handleUpdateUser}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Spara ändringar
                 </button>
@@ -642,7 +708,12 @@ export default function TeamManagement() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            ref={deleteDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Radera användare"
+            tabIndex={-1}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -671,16 +742,14 @@ export default function TeamManagement() {
               
               <div className="flex justify-end gap-3">
                 <button
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setSelectedUser(null);
-                  }}
+                  onClick={closeDelete}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                 >
                   Avbryt
                 </button>
                 <button
                   onClick={handleDeleteUser}
+                  disabled={saving}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
                 >
                   Radera användare

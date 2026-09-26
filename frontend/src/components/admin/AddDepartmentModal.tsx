@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDialog } from '../../hooks/useDialog';
 import { X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -15,6 +16,8 @@ export default function AddDepartmentModal({ isOpen, onClose, onSuccess }: AddDe
     location: '',
   });
   const [loading, setLoading] = useState(false);
+
+  const dialogRef = useDialog(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -46,12 +49,13 @@ export default function AddDepartmentModal({ isOpen, onClose, onSuccess }: AddDe
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1} aria-label="Skapa ny avdelning" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 focus:outline-none">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-xl font-bold text-gray-800">Skapa Ny Avdelning</h2>
           <button
             onClick={onClose}
+            aria-label="Stäng"
             className="p-1 hover:bg-gray-100 rounded transition"
           >
             <X size={24} />

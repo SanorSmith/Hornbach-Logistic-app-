@@ -37,6 +37,22 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// Errors from Supabase Auth / Postgres are logged here and turned into short
+// Swedish messages for the app, so internal details (constraint and function
+// names, raw SQL errors) are not sent to the browser.
+function friendlyError(context: string, error: { message?: string } | null | undefined, fallback: string) {
+  const message = error?.message ?? '';
+  console.error(`admin-users ${context}:`, message);
+  if (/already (been )?registered|already exists|duplicate key.*email/i.test(message)) {
+    return 'Det finns redan ett konto med den e-postadressen.';
+  }
+  if (/invalid.*email|email.*invalid|validate email/i.test(message)) {
+    return 'Ogiltig e-postadress.';
+  }
+  if (/password/i.test(message)) return 'Lösenordet är för svagt. Använd minst 8 tecken.';
+  return fallback;
+}
+
 function generatePassword(length = 14) {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
   const bytes = crypto.getRandomValues(new Uint32Array(length));
@@ -60,12 +76,16 @@ Deno.serve(async (req) => {
 
   const { data: caller } = await admin
     .from('users')
-    .select('id, role, is_active, facility_id')
+    .select('id, role, is_active, facility_id, must_change_password')
     .eq('id', authData.user.id)
     .maybeSingle();
 
   if (!caller || !caller.is_active || !['ADMIN', 'TEAM_LEADER', 'SUPER_ADMIN'].includes(caller.role)) {
     return json({ error: 'Forbidden' }, 403);
+  }
+  // A temporary password must be changed before the account can manage users.
+  if (caller.must_change_password) {
+    return json({ error: 'Byt ditt tillfälliga lösenord först.' }, 403);
   }
   const callerIsSuperAdmin = caller.role === 'SUPER_ADMIN';
   const callerIsAdmin = caller.role === 'ADMIN';
@@ -105,7 +125,7 @@ Deno.serve(async (req) => {
       user_metadata: { full_name: input.fullName, role: input.role },
     });
     if (createError || !created.user) {
-      return { error: createError?.message ?? 'Kunde inte skapa konto' };
+      return { error: friendlyError('createUser', createError, 'Kunde inte skapa kontot.') };
     }
 
     const { data: profile, error: profileError } = await admin
@@ -127,7 +147,7 @@ Deno.serve(async (req) => {
     if (profileError) {
       // Roll back the auth account so we don't leave orphans behind.
       await admin.auth.admin.deleteUser(created.user.id);
-      return { error: profileError.message };
+      return { error: friendlyError('insert profile', profileError, 'Kunde inte spara användarprofilen.') };
     }
 
     return {
@@ -174,8 +194,11 @@ Deno.serve(async (req) => {
       p_phone: facility.phone ? String(facility.phone) : null,
     });
     if (facilityError || !facilityId) {
-      const message = facilityError?.message ?? 'Kunde inte skapa butiken';
-      return json({ error: message.replace(/^FACILITY_EXISTS:\s*/, '') }, 400);
+      const message = facilityError?.message ?? '';
+      if (message.startsWith('FACILITY_EXISTS:')) {
+        return json({ error: message.replace(/^FACILITY_EXISTS:\s*/, '') }, 400);
+      }
+      return json({ error: friendlyError('create_facility', facilityError, 'Kunde inte skapa butiken.') }, 400);
     }
 
     const result = await createAccount({ ...account, role: 'ADMIN', facilityId, departmentId: null });
@@ -202,19 +225,19 @@ Deno.serve(async (req) => {
     }
 
     const { data: plan, error: planError } = await admin.rpc('facility_deletion_plan', { p_facility_id: facilityId });
-    if (planError) return json({ error: planError.message }, 400);
+    if (planError) return json({ error: friendlyError('deletion plan', planError, 'Kunde inte radera butiken.') }, 400);
     const userIds = (plan?.user_ids ?? []) as string[];
     const objectPaths = (plan?.object_paths ?? []) as string[];
 
     // Photos first: once the rows are gone we can no longer find the files.
     for (let i = 0; i < objectPaths.length; i += 100) {
       const { error } = await admin.storage.from('point-images').remove(objectPaths.slice(i, i + 100));
-      if (error) return json({ error: `Kunde inte radera bilder: ${error.message}` }, 400);
+      if (error) return json({ error: friendlyError('remove photos', error, 'Kunde inte radera butikens bilder.') }, 400);
     }
 
     // All rows in one transaction.
     const { error: deleteError } = await admin.rpc('delete_facility_data', { p_facility_id: facilityId });
-    if (deleteError) return json({ error: deleteError.message }, 400);
+    if (deleteError) return json({ error: friendlyError('delete facility', deleteError, 'Kunde inte radera butiken.') }, 400);
 
     // Finally the login accounts (their profiles are already gone).
     const failed: string[] = [];
@@ -295,7 +318,7 @@ Deno.serve(async (req) => {
 
     const { error: authDeleteError } = await admin.auth.admin.deleteUser(userId);
     if (authDeleteError && !/not.*found/i.test(authDeleteError.message)) {
-      return json({ error: authDeleteError.message }, 400);
+      return json({ error: friendlyError('delete auth user', authDeleteError, 'Kunde inte radera inloggningen.') }, 400);
     }
     return json({ deleted: true });
   }

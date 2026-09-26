@@ -15,13 +15,9 @@ export function useDepartmentAssignments() {
     
     try {
       setLoading(true);
-      console.log('Starting to fetch assignments...');
-      
       const { data, error } = await supabase
         .from('department_point_assignments')
         .select('point_id, department_number, department_id');
-
-      console.log('Supabase response:', { data, error });
 
       if (error) {
         console.error('Supabase error:', error);
@@ -29,13 +25,11 @@ export function useDepartmentAssignments() {
       }
 
       if (data) {
-        console.log('Raw data from Supabase:', data);
         const rows = data as { point_id: string; department_number: string; department_id: string }[];
         const assignmentsMap = rows.reduce((acc, assignment) => {
           acc[assignment.point_id] = assignment.department_number;
           return acc;
         }, {} as Record<string, string>);
-        console.log('Processed assignments map:', assignmentsMap);
         setAssignments(assignmentsMap);
         setAssignedDepartments(
           rows.reduce((acc, assignment) => {
@@ -43,8 +37,6 @@ export function useDepartmentAssignments() {
             return acc;
           }, {} as Record<string, string>)
         );
-      } else {
-        console.log('No data returned from Supabase');
       }
     } catch (error) {
       console.error('Error fetching assignments:', error);

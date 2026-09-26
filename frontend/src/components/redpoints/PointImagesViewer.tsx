@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { useDialog } from '../../hooks/useDialog';
 import { RedPoint } from '../../types';
 import { getStatusLabel } from '../../utils/statusColors';
 import StatusCircle from './StatusCircle';
@@ -12,9 +13,11 @@ interface PointImagesViewerProps {
 
 /** Read-only view of a point's latest photos and notes (Monitor dashboard). */
 export default function PointImagesViewer({ point, label, onClose }: PointImagesViewerProps) {
+  const dialogRef = useDialog(true, onClose);
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4"
+      ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1} aria-label={`Bilder för punkt ${label}`}
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4 focus:outline-none"
       onClick={onClose}
     >
       <div

@@ -33,13 +33,27 @@ async function loadProfile(authUser: SupabaseUser): Promise<User | null> {
  * Keeps the auth store in sync with the Supabase session.
  * Mount exactly once, near the root of the app.
  */
+/** Why this profile may not use the app, or null when it may. */
+function accessProblem(profile: User): string | null {
+  if (!profile.is_active) return 'Kontot är inaktiverat. Kontakta administratören.';
+  // The facility is only readable while it is open.
+  if (profile.role !== 'SUPER_ADMIN' && !profile.facility) {
+    return 'Butiken är stängd i systemet. Kontakta administratören.';
+  }
+  return null;
+}
+
 export function useAuthListener() {
   useEffect(() => {
     const { setUser, logout } = useAuthStore.getState();
+    // Profiles load asynchronously; only the newest auth event may set the user,
+    // so a slow load can't put back a user who has just been signed out.
+    let latestEvent = 0;
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      const eventNumber = ++latestEvent;
       if (event === 'SIGNED_OUT' || !session?.user) {
         logout();
         return;
@@ -49,6 +63,16 @@ export function useAuthListener() {
         // Defer Supabase calls out of the auth callback to avoid a client deadlock.
         setTimeout(async () => {
           const profile = await loadProfile(authUser);
+          if (eventNumber !== latestEvent) return;
+
+          // A saved session (app reopened) gets the same checks as a new login.
+          // Fresh logins are checked by signIn(), which shows its own message.
+          const problem = profile ? accessProblem(profile) : null;
+          if (problem && event !== 'SIGNED_IN') {
+            toast.error(problem);
+            await supabase.auth.signOut();
+            return;
+          }
           setUser(profile, authUser);
         }, 0);
       }
@@ -77,14 +101,9 @@ export function useAuth() {
       await supabase.auth.signOut();
       return null;
     }
-    if (!profile.is_active) {
-      toast.error('Kontot är inaktiverat. Kontakta administratören.');
-      await supabase.auth.signOut();
-      return null;
-    }
-    // The facility is only readable while it is open.
-    if (profile.role !== 'SUPER_ADMIN' && !profile.facility) {
-      toast.error('Butiken är stängd i systemet. Kontakta administratören.');
+    const problem = accessProblem(profile);
+    if (problem) {
+      toast.error(problem);
       await supabase.auth.signOut();
       return null;
     }
