@@ -109,17 +109,20 @@ test.describe('LineFeeder dashboard', () => {
     await expect(page.getByText('Inga punkter matchar filtret.')).toBeVisible();
   });
 
-  test('remembers the chosen avdelning on this device', async ({ page }) => {
+  test('remembers the chosen avdelning and status on this device', async ({ page }) => {
     await fakeSupabase(page, { role: 'LINEFEEDER' });
     await logIn(page);
     await page.getByRole('combobox', { name: 'Avdelning' }).selectOption({ label: 'Bygg' });
     await expect(cardTitles(page)).toHaveCount(3);
+    await page.getByRole('button', { name: 'LEDIG', exact: true }).click();
+    await expect(cardTitles(page)).toHaveText(['IB3']);
 
     await page.reload();
     await expect(page.getByRole('combobox', { name: 'Avdelning' })).toHaveValue('d-bygg');
-    await expect(cardTitles(page)).toHaveText(['IB2', 'IB1', 'IB3']);
+    await expect(cardTitles(page)).toHaveText(['IB3']);
 
-    // Back to every avdelning: nothing is remembered any more.
+    // Back to every status and avdelning: nothing is remembered any more.
+    await page.getByRole('button', { name: 'Alla', exact: true }).click();
     await page.getByRole('combobox', { name: 'Avdelning' }).selectOption({ label: 'Alla avdelningar' });
     await page.reload();
     await expect(cardTitles(page)).toHaveCount(6);
