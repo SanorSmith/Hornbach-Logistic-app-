@@ -1,5 +1,6 @@
--- Tests for migrations/20260926130000_extra_pallets.sql and
--- 20260926150000_extra_pallets_rules.sql.
+-- Tests for migrations/20260926130000_extra_pallets.sql,
+-- 20260926150000_extra_pallets_rules.sql and
+-- 20260926170000_extra_pallets_authorized_by.sql.
 --
 -- Run the migrations not yet applied and then this file as ONE batch (one transaction), e.g.
 -- through the Supabase SQL editor or the MCP execute_sql tool. The script
@@ -67,11 +68,11 @@ declare
   v_pallet public.point_pallets%rowtype;
   v_grant public.point_allowances%rowtype;
 begin
-  -- Existing UPPTAGEN points got their pallet row from the migration.
+  -- Every UPPTAGEN point has its pallet rows (backfilled by the first migration).
   perform pg_temp.ok(
     (select count(*) from public.red_points where status = 'UPPTAGEN')
-    = (select count(*) from public.point_pallets where picked_at is null),
-    'every UPPTAGEN point has exactly one open pallet after the backfill');
+    = (select count(distinct point_id) from public.point_pallets where picked_at is null),
+    'every UPPTAGEN point has open pallets');
 
   -- Fixtures: a test store with two avdelningar, one point each, four users.
   insert into public.facilities (id, code, name, is_active) values (f, 'ZZTEST-EP', 'Test extrapallar', true);
@@ -105,13 +106,15 @@ begin
   perform pg_temp.act_as(lf);
   perform pg_temp.expect_error(format('insert into public.point_pallets (point_id) values (%L)', p1), 'PALLET_LIMIT:1');
 
-  -- 3. Who may grant: not another avdelning, not Monitor, not LineFeeder.
+  -- 3. Who may grant: not another avdelning, not Monitor; a LineFeeder only
+  --    with the name of whoever authorized it.
   perform pg_temp.act_as(dep);
   perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 3)', p2), 'row-level security');
   perform pg_temp.act_as(mon);
   perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 3)', p1), 'row-level security');
   perform pg_temp.act_as(lf);
-  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 3)', p1), 'row-level security');
+  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets) values (%L, 3)', p1), 'AUTHORIZED_BY_REQUIRED');
+  perform pg_temp.expect_error(format('insert into public.point_allowances (point_id, max_pallets, authorized_by_name) values (%L, 3, %L)', p1, '   '), 'AUTHORIZED_BY_REQUIRED');
 
   -- 4. The avdelning grants on its own point, registered under its own name.
   perform pg_temp.act_as(dep);
@@ -190,10 +193,17 @@ begin
   perform pg_temp.ok((select status from public.red_points where id = p1) = 'LEDIG', 'last pallet picked -> LEDIG');
   perform pg_temp.ok(not (select picked_as_extra from public.point_pallets where id = v_first), 'the last pick is not extra');
 
-  -- 10b. A LineFeeder may end a privilege early once at most one pallet is left.
-  perform pg_temp.act_as(tl);
-  insert into public.point_allowances (point_id, max_pallets) values (p1, 2) returning id into v_allow;
+  -- 10b. A LineFeeder registers a privilege for the avdelning, naming who
+  --      authorized it, and may end it early once at most one pallet is left.
   perform pg_temp.act_as(lf);
+  insert into public.point_allowances (point_id, max_pallets, authorized_by_name)
+    values (p1, 2, '  Anna Avdelning  ') returning id into v_allow;
+  perform pg_temp.act_as(null);
+  select * into v_grant from public.point_allowances where id = v_allow;
+  perform pg_temp.ok(v_grant.granted_by = lf and v_grant.authorized_by_name = 'Anna Avdelning',
+    'registered by the LineFeeder, authorized by the named person');
+  perform pg_temp.act_as(lf);
+  perform pg_temp.expect_error(format('update public.point_allowances set authorized_by_name = %L where id = %L', 'Someone else', v_allow), 'Only the maximum');
   update public.point_allowances set ended_at = now() where id = v_allow;
   perform pg_temp.act_as(null);
   select * into v_grant from public.point_allowances where id = v_allow;
