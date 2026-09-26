@@ -6,6 +6,7 @@ import { useRedPoints } from '../hooks/useRedPoints';
 import { useDepartmentAssignments } from '../hooks/useDepartmentAssignments';
 import { useDepartments } from '../hooks/useDepartments';
 import { usePallets } from '../hooks/usePallets';
+import { useDeviceSetting } from '../hooks/useDeviceSetting';
 import { useAuth } from '../hooks/useAuth';
 import { RedPoint, PointStatus } from '../types';
 import RedPointGrid from '../components/redpoints/RedPointGrid';
@@ -32,8 +33,11 @@ export default function LineFeederDashboard() {
   const [showScanner, setShowScanner] = useState(false);
   const scannerDialogRef = useDialog(showScanner, () => setShowScanner(false));
   const [filterStatus, setFilterStatus] = useState<PointStatus | 'ALL'>('ALL');
-  // '' = every avdelning.
-  const [filterDepartment, setFilterDepartment] = useState('');
+  // '' = every avdelning. Remembered on this device: a handheld usually serves
+  // the same avdelning. A remembered avdelning that no longer exists is ignored.
+  const [storedDepartment, setFilterDepartment] = useDeviceSetting('linefeeder.avdelning');
+  const filterDepartment =
+    departments.length === 0 || departments.some((d) => d.id === storedDepartment) ? storedDepartment : '';
 
   const handlePointClick = (point: RedPoint) => {
     setSelectedPointId(point.id);
