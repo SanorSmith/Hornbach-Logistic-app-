@@ -40,6 +40,7 @@ const allowance: PointAllowance = {
   point_id: 'p1',
   max_pallets: 3,
   note: 'Kampanj v. 40',
+  authorized_by_name: null,
   granted_by: 'dep',
   granted_at: new Date().toISOString(),
   ended_at: null,
@@ -65,31 +66,19 @@ describe('PointPalletsPanel', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('lets the avdelning allow extra pallets, in its own name', async () => {
-    setPallets([pallet('x')]);
-    render(<PointPalletsPanel point={point} canGrant />);
-
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Antal pallar' }), '3');
-    await userEvent.type(screen.getByRole('textbox', { name: 'Anledning' }), 'Kampanj');
-    await userEvent.click(screen.getByRole('button', { name: 'Tillåt extra pallar' }));
-
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Punkten får ha 3 pallar'));
-    // Only the point, the number and the reason: who granted it is set by the database.
-    expect(mock.calls).toContainEqual({
-      table: 'point_allowances',
-      method: 'insert',
-      args: [{ point_id: 'p1', max_pallets: 3, note: 'Kampanj' }],
-    });
-  });
-
   it('gives the avdelning no way to lower or end the privilege once granted', () => {
     setPallets([pallet('x')], [allowance]);
-    render(<PointPalletsPanel point={point} canGrant canPick />);
+    render(<PointPalletsPanel point={point} canPick />);
 
     expect(screen.getByText(/kan bara minskas eller avslutas av LineFeeder eller teamledare/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Avsluta tillstånd' })).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Max pallar' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Tillåt extra pallar' })).not.toBeInTheDocument();
+  });
+
+  it('shows who authorized a privilege a LineFeeder registered', () => {
+    setPallets([pallet('x')], [{ ...allowance, authorized_by_name: 'Anna Avdelning', granter: { full_name: 'Lars LineFeeder' } }]);
+    render(<PointPalletsPanel point={point} />);
+    expect(screen.getByText(/max 3\) av Anna Avdelning \(reg\. Lars LineFeeder\)/)).toBeInTheDocument();
   });
 
   it('lets a LineFeeder lower the maximum, but not raise it', async () => {

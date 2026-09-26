@@ -154,16 +154,52 @@ test.describe('Extra pallets', () => {
 
     await cardTitles(page).filter({ hasText: /^IB3$/ }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('combobox', { name: 'Antal pallar' }).selectOption('3');
-    await dialog.getByRole('textbox', { name: 'Anledning' }).fill('Kampanj');
+    // The button opens a form; nothing is saved until it is confirmed.
     await dialog.getByRole('button', { name: 'Tillåt extra pallar' }).click();
+    await dialog.getByRole('combobox', { name: 'Antal pallar' }).selectOption('3');
+    await dialog.getByRole('textbox', { name: 'Anledning (valfritt)' }).fill('Kampanj');
+    await expect(dialog.getByRole('textbox', { name: 'Godkänt av' })).toHaveCount(0);
+    expect(db.palletWrites).toEqual([]);
+    await dialog.getByRole('button', { name: 'Bekräfta' }).click();
 
     await expect(dialog.getByText(/Extra pallar tillåtna \(max 3\) av Anna Andersson/)).toBeVisible();
     await expect(page.getByText('0/3 pallar')).toBeVisible(); // on the IB3 card
     // Who granted it is set by the database, never sent by the app.
     expect(db.palletWrites).toEqual([
-      { table: 'point_allowances', method: 'POST', body: { point_id: 'p6', max_pallets: 3, note: 'Kampanj' } },
+      {
+        table: 'point_allowances',
+        method: 'POST',
+        body: { point_id: 'p6', max_pallets: 3, note: 'Kampanj', authorized_by_name: null },
+      },
     ]);
+  });
+
+  test('a LineFeeder registers extra pallets for the avdelning, naming who authorized it', async ({ page }) => {
+    const db = await fakeSupabase(page, { role: 'LINEFEEDER' });
+    await logIn(page);
+    await cardTitles(page).filter({ hasText: /^IB3$/ }).click();
+    const dialog = page.getByRole('dialog');
+
+    await dialog.getByRole('button', { name: 'Tillåt extra pallar' }).click();
+    await expect(dialog.getByRole('button', { name: 'Bekräfta' })).toBeDisabled();
+    await dialog.getByRole('textbox', { name: 'Godkänt av' }).fill('Kalle Bygg');
+    await dialog.getByRole('button', { name: 'Bekräfta' }).click();
+
+    await expect(dialog.getByText(/max 2\) av Kalle Bygg \(reg\. Anna Andersson\)/)).toBeVisible();
+    expect(db.palletWrites).toEqual([
+      {
+        table: 'point_allowances',
+        method: 'POST',
+        body: { point_id: 'p6', max_pallets: 2, note: null, authorized_by_name: 'Kalle Bygg' },
+      },
+    ]);
+  });
+
+  test('zoom is disabled on tablets and phones', async ({ page }) => {
+    await fakeSupabase(page, { role: 'LINEFEEDER' });
+    await page.goto('/login');
+    await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /maximum-scale=1\.0, user-scalable=no/);
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).touchAction)).toBe('manipulation');
   });
 
   test('an avdelning cannot grant extra pallets on another avdelning’s point', async ({ page }) => {

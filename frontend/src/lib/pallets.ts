@@ -14,7 +14,7 @@ export const MAX_PALLETS = 10;
 const PALLET_COLUMNS =
   'id, point_id, is_extra, image_id, note, placed_by, placed_at, picked_at, placer:users!point_pallets_placed_by_fkey(full_name)';
 const ALLOWANCE_COLUMNS =
-  'id, point_id, max_pallets, note, granted_by, granted_at, ended_at, granter:users!point_allowances_granted_by_fkey(full_name)';
+  'id, point_id, max_pallets, note, authorized_by_name, granted_by, granted_at, ended_at, granter:users!point_allowances_granted_by_fkey(full_name)';
 
 /** Pallets still standing on a point, in the caller's store. */
 export async function fetchOpenPallets(): Promise<PointPallet[]> {
@@ -81,12 +81,29 @@ export async function pickPallet(palletId: string): Promise<void> {
   if (!data || (data as unknown[]).length === 0) throw new Error('not allowed');
 }
 
-/** Lets the point hold up to `maxPallets` pallets, in the signed-in user's name. */
-export async function grantAllowance(pointId: string, maxPallets: number, note?: string): Promise<void> {
-  const { error } = await supabase
-    .from('point_allowances' as never)
-    .insert({ point_id: pointId, max_pallets: maxPallets, note: note?.trim() || null } as never);
+/**
+ * Lets the point hold up to `maxPallets` pallets. Registered in the signed-in
+ * user's name; `authorizedBy` is who approved it (required for a LineFeeder).
+ */
+export async function grantAllowance(
+  pointId: string,
+  maxPallets: number,
+  note?: string,
+  authorizedBy?: string
+): Promise<void> {
+  const { error } = await supabase.from('point_allowances' as never).insert({
+    point_id: pointId,
+    max_pallets: maxPallets,
+    note: note?.trim() || null,
+    authorized_by_name: authorizedBy?.trim() || null,
+  } as never);
   if (error) throw error;
+}
+
+/** "Anna Avdelning (reg. Lars LineFeeder)" when someone registered it for the approver. */
+export function allowanceAuthorizer(allowance: PointAllowance): string {
+  const registeredBy = allowance.granter?.full_name ?? 'okänd';
+  return allowance.authorized_by_name ? `${allowance.authorized_by_name} (reg. ${registeredBy})` : registeredBy;
 }
 
 export async function changeAllowance(allowanceId: string, maxPallets: number): Promise<void> {
@@ -121,6 +138,7 @@ export function palletErrorMessage(error: unknown): string {
   }
   if (code === 'ALLOWANCE_TOO_LOW') return `Det står ${count} pallar på punkten. Välj minst ${count}.`;
   if (code === 'PICK_EXTRA_FIRST') return `Det står ${count} pallar på punkten. Plocka extrapallarna först.`;
+  if (message.includes('AUTHORIZED_BY_REQUIRED')) return 'Skriv namnet på den som godkände extra pallar.';
   if (message.includes('point_allowances_one_active_idx')) return 'Punkten har redan ett tillstånd för extra pallar.';
   if (message.includes('already been picked')) return 'Pallen är redan plockad.';
   if (/row-level security|not allowed/i.test(message)) return 'Du har inte behörighet att göra det här.';

@@ -8,7 +8,7 @@ const images = vi.hoisted(() => ({
 }));
 vi.mock('./pointImages', () => images);
 
-import { grantAllowance, palletErrorMessage, palletSummary, pickPallet, placePallet } from './pallets';
+import { allowanceAuthorizer, grantAllowance, palletErrorMessage, palletSummary, pickPallet, placePallet } from './pallets';
 import type { PointAllowance, PointPallet } from '../types';
 
 const pallet = (id: string, point_id: string, picked_at: string | null = null): PointPallet => ({
@@ -27,6 +27,7 @@ const allowance = (point_id: string, max_pallets: number): PointAllowance => ({
   point_id,
   max_pallets,
   note: null,
+  authorized_by_name: null,
   granted_by: 'u2',
   granted_at: '2026-09-26T07:00:00Z',
   ended_at: null,
@@ -57,6 +58,7 @@ describe('palletErrorMessage', () => {
     ['PALLET_LIMIT:3', 'Punkten är full (max 3 pallar).'],
     ['ALLOWANCE_TOO_LOW:4', 'Det står 4 pallar på punkten. Välj minst 4.'],
     ['PICK_EXTRA_FIRST:3', 'Det står 3 pallar på punkten. Plocka extrapallarna först.'],
+    ['AUTHORIZED_BY_REQUIRED', 'Skriv namnet på den som godkände extra pallar.'],
     ['duplicate key value violates unique constraint "point_allowances_one_active_idx"', 'Punkten har redan ett tillstånd för extra pallar.'],
     ['new row violates row-level security policy for table "point_allowances"', 'Du har inte behörighet att göra det här.'],
     ['Failed to fetch', 'Det gick inte att spara. Kontrollera anslutningen och försök igen.'],
@@ -109,7 +111,24 @@ describe('grantAllowance', () => {
     expect(mock.calls).toContainEqual({
       table: 'point_allowances',
       method: 'insert',
-      args: [{ point_id: 'p1', max_pallets: 3, note: 'Kampanj' }],
+      args: [{ point_id: 'p1', max_pallets: 3, note: 'Kampanj', authorized_by_name: null }],
     });
+  });
+
+  it('sends who authorized it when a LineFeeder registers it', async () => {
+    await grantAllowance('p1', 2, '', '  Anna Avdelning ');
+    expect(mock.calls).toContainEqual({
+      table: 'point_allowances',
+      method: 'insert',
+      args: [{ point_id: 'p1', max_pallets: 2, note: null, authorized_by_name: 'Anna Avdelning' }],
+    });
+  });
+});
+
+describe('allowanceAuthorizer', () => {
+  it('names who approved it and who registered it', () => {
+    const a = { ...allowance('p1', 3), granter: { full_name: 'Lars LineFeeder' } };
+    expect(allowanceAuthorizer(a)).toBe('Lars LineFeeder');
+    expect(allowanceAuthorizer({ ...a, authorized_by_name: 'Anna Avdelning' })).toBe('Anna Avdelning (reg. Lars LineFeeder)');
   });
 });
